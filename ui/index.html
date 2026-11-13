@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Reclamos – Cliente</title>
+<link rel="stylesheet" href="estilos.css">
+</head>
+<body>
+<main>
+  <h1>Reclamo de pago con tarjeta</h1>
+  <p class="nota">Cuéntenos su caso por voz y adjunte la constancia de pago. La respuesta se entrega <b>solo en audio</b>.</p>
+
+  <section id="paso-sesion">
+    <h2>1. Verificación</h2>
+    <button id="btn-sesion">Iniciar sesión y enviar código</button>
+    <p id="otp-info" class="nota"></p>
+    <label>Código OTP <input id="otp" inputmode="numeric" maxlength="6" autocomplete="one-time-code"></label>
+  </section>
+
+  <section>
+    <h2>2. Su relato (audio)</h2>
+    <button id="btn-grabar" type="button">● Grabar</button>
+    <span id="estado-grab" class="nota"></span>
+    <label>o suba un archivo <input id="archivo-audio" type="file" accept="audio/*"></label>
+    <audio id="previa-audio" controls hidden></audio>
+    <label>Texto de apoyo (opcional; útil en modo demo sin voz real) <input id="texto" style="width:100%"></label>
+  </section>
+
+  <section>
+    <h2>3. Constancia de pago (imagen)</h2>
+    <input id="archivo-imagen" type="file" accept="image/png,image/jpeg">
+    <img id="previa-imagen" alt="Vista previa de la constancia" hidden>
+  </section>
+
+  <button id="btn-enviar" class="principal" disabled>Enviar reclamo</button>
+  <p id="aviso" role="status"></p>
+
+  <section id="respuesta" hidden>
+    <h2>Respuesta</h2>
+    <audio id="audio-respuesta" controls autoplay></audio>
+  </section>
+
+  <details id="debug">
+    <summary>Detalle técnico (depuración)</summary>
+    <pre id="debug-json"></pre>
+  </details>
+  <p class="nota"><a href="analista.html">Consola del analista</a> · <a href="/docs">API (OpenAPI)</a></p>
+</main>
+<script src="app.js"></script>
+<script>iniciarCliente();</script>
+</body>
+</html>

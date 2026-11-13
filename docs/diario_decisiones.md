@@ -1,0 +1,20 @@
+# Diario de decisiones
+
+> Cada fila describe una decisión **tomada al construir** este proyecto. Revísela y ajústela con su propia experiencia antes de entregar.
+
+| # | Problema | Alternativas | Decisión | Justificación | Riesgo |
+|---|---|---|---|---|---|
+| D1 | ¿Cómo procesar el audio? | Audio directo al LLM / STT previo | STT previo (Whisper) | La transcripción se registra, se valida (vacía = ininteligible) y se mide | Se pierde tono y urgencia |
+| D2 | ¿Quién decide el dinero? | Solo LLM / reglas + LLM | `politicas/motor.py` decide; el agente solo coincide o escala | Reproducible y auditable; el LLM no puede "convencerse" de reembolsar | Dos fuentes de verdad (documento de políticas vs. código) |
+| D3 | ¿Cómo acceder a la BD? | SQL directo / MCP | MCP con tools tipadas (14) | El LLM nunca escribe SQL; mínimo privilegio; contrato versionable | Latencia y un proceso más (stdio) |
+| D4 | ¿Dónde guardar la memoria? | `MemorySaver` / SQLite / Azure SQL con paquete comunitario / saver propio | `SqlServerSaver` propio (pyodbc) | `langgraph-checkpoint-mssql` exige Python ≥ 3.12 y el entorno es 3.11; la reanudación HITL necesita persistencia real | Mantener código propio; ver `evidencia/fallas/falla_1` |
+| D5 | Fuente con mayor autoridad | Imagen / BD | BD > imagen > relato | La imagen es percepción falible y puede estar alterada | BD desactualizada: se escala y **no** se corrige sola |
+| D6 | Idempotencia del ticket | Sin control / clave por request | `Idempotency-Key` (o `sesion\|operación`) → `ticket_id` determinista + tabla `IdempotencyKey` | Reintentos no duplican tickets ni acciones | Colisión por claves mal generadas |
+| D7 | Respuesta solo audio | Texto + audio | Solo TTS en la UI; el texto va en JSON/logs | Requisito del caso | Accesibilidad |
+| D8 | `thread_id` del checkpoint | ticket / sesión | **sesión** (`SES-…`) | El ticket aún no existe al iniciar el turno 1; la memoria es por conversación | Una sesión con varios reclamos comparte hilo (se separa por ticket en el estado) |
+| D9 | Orden de la verificación OTP | Antes / después de la visión | **Antes** | No se gasta visión ni se expone nada a un usuario no autenticado | El primer error de OTP llega antes de validar la imagen |
+| D10 | Texto de la respuesta hablada | Redactado por el LLM / plantillas | Plantillas con datos de la BD (`respuestas.py`) | Un monto o fecha inventados en dinero son inaceptables | Menos naturalidad |
+| D11 | Ejecutar acciones | Confiar en el grafo / verificar también en la tool | La tool vuelve a verificar `AprobacionHitl.estado='APROBADA'` en BD | Defensa en profundidad si alguien invoca la tool fuera del grafo | Una consulta más por acción |
+| D12 | Acceso concurrente del checkpointer | `IF NOT EXISTS`+`HOLDLOCK` / `INSERT` ignorando duplicado | `INSERT` y captura de `IntegrityError` | Evita bloqueos de rango y deadlocks; ver `falla_1` | Depende de la PK para deduplicar |
+| D13 | Proveedor de IA | SDK directo en los nodos / interfaz | `ProveedorIA` (Azure o mock) | Permite pruebas deterministas sin red ni costo y cambiar de proveedor | El mock no prueba la calidad real de visión/STT |
+| D14 | Esquema Liquibase | `createTable` nativo / `sqlFile` | `sqlFile` + rollback por changeSet | El mismo SQL lo ejecuta el runner Python cuando no hay Java/Docker | El YAML con Liquibase real no se probó en este entorno |

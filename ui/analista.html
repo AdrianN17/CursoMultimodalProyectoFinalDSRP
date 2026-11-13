@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Reclamos – Analista</title>
+<link rel="stylesheet" href="estilos.css">
+</head>
+<body>
+<main>
+  <h1>Aprobaciones pendientes</h1>
+  <section>
+    <label>Clave de analista <input id="clave" type="password" value="demo-analista"></label>
+    <label>Nombre <input id="aprobador" value="analista.demo"></label>
+    <label>Rol
+      <select id="rol"><option>ANALISTA</option><option>SUPERVISOR</option></select>
+    </label>
+    <button id="btn-refrescar">Actualizar</button>
+  </section>
+  <p id="aviso" role="status"></p>
+  <div id="lista"></div>
+  <details><summary>Detalle técnico (depuración)</summary><pre id="debug-json"></pre></details>
+  <p class="nota"><a href="index.html">Vista del cliente</a></p>
+</main>
+<script src="app.js"></script>
+<script>iniciarAnalista();</script>
+</body>
+</html>

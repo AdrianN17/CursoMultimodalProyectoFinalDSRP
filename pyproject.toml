@@ -1,0 +1,9 @@
+[project]
+name = "agente-reclamos-multimodal"
+version = "1.0.0"
+description = "Agente multimodal (voz + imagen) para reclamos bancarios con LangGraph, MCP, RAG y HITL"
+requires-python = ">=3.11"
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]
+testpaths = ["tests"]

@@ -1,0 +1,19 @@
+:root { --azul:#0b5cab; --gris:#5b6770; --borde:#d5dbe0; }
+* { box-sizing: border-box; }
+body { font-family: system-ui, Segoe UI, sans-serif; margin: 0; background: #f4f6f8; color: #1d2733; }
+main { max-width: 640px; margin: 0 auto; padding: 1rem; }
+h1 { font-size: 1.4rem; } h2 { font-size: 1.05rem; margin: 0 0 .5rem; }
+section, .tarjeta { background: #fff; border: 1px solid var(--borde); border-radius: 8px; padding: 1rem; margin: .8rem 0; }
+label { display: block; margin: .4rem 0; font-size: .9rem; }
+input, select, textarea { padding: .45rem; border: 1px solid var(--borde); border-radius: 6px; font: inherit; max-width: 100%; }
+button { padding: .55rem 1rem; border: 1px solid var(--azul); background: #fff; color: var(--azul); border-radius: 6px;
+         cursor: pointer; font: inherit; }
+button.principal { background: var(--azul); color: #fff; width: 100%; }
+button:disabled { opacity: .5; cursor: not-allowed; }
+.nota { color: var(--gris); font-size: .85rem; }
+#aviso { min-height: 1.4rem; font-weight: 600; }
+#aviso.error { color: #b3261e; } #aviso.ok { color: #1e7b34; }
+img#previa-imagen { max-width: 100%; margin-top: .5rem; border: 1px solid var(--borde); }
+audio { width: 100%; margin-top: .5rem; }
+pre { overflow: auto; background: #10161c; color: #d8e1e8; padding: .7rem; border-radius: 6px; font-size: .78rem; }
+.tarjeta .acciones { display: flex; gap: .5rem; margin-top: .6rem; }
