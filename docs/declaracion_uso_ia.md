@@ -5,7 +5,7 @@
 ## 1. Herramientas usadas y para qué
 
 - **GitHub Copilot (AI assistant en VS Code):** diseño del plano (`planos.md`), generación de código, pruebas, scripts y documentación; ejecución de las pruebas y de las verificaciones contra los servicios en la nube.
-- **Azure OpenAI vía Foundry (en ejecución, no en desarrollo):** `gpt-5-mini` (chat, visión y router) y `text-embedding-3-small` (RAG) dentro del agente; Whisper y TTS están previstos pero sus *deployments* aún no existen. En desarrollo y en las pruebas se usó el proveedor *mock*.
+- **Azure OpenAI vía Foundry (en ejecución, no en desarrollo):** `gpt-5-mini` (chat, visión y router) y `text-embedding-3-small` (RAG) dentro del agente, más **MAI-Transcribe-1.5** (STT) y **MAI-Voice-2** (TTS) de Azure Speech. En desarrollo y en las pruebas se usó el proveedor *mock*.
 
 ## 2. Código sugerido que se incorporó (archivo y función)
 
@@ -36,7 +36,7 @@ Cambios que pedí yo al asistente y que modificaron el resultado inicial:
 ## 4. Decisiones propias que la IA no habría tomado
 
 - Usar **Qdrant Cloud y Azure SQL** del curso en vez de la infraestructura local que el asistente había montado por defecto.
-- Tratar el **OTP de la operación** como dato maestro del fraude (P-11), distinto del OTP de verificación de quien reclama: el asistente no propuso esa regla de negocio.
+- Tratar el **OTP de la operación** como dato maestro del fraude (P-11), y **eliminar el OTP de sesión y los correos**: el asistente había incluido una verificación por OTP en la web y un correo al operador; yo indiqué que el OTP solo es dato de la BD y que la aprobación debe darse desde consola.
 - Aislar el proyecto en un **esquema propio** en una base compartida, en lugar de usar `dbo`.
 - Pedir que el **entorno de pruebas no toque ningún servicio real** y validar yo mismo el caso de integración contra Azure SQL (lo ejecuté en mi consola y confirmé el resultado).
 
@@ -49,7 +49,8 @@ Otros hechos en los que la IA se equivocó o dejó algo incompleto:
 1. **Corrección incompleta del checkpointer.** Ante un deadlock (SQL 1205) en `put_writes`, la primera solución fue `WITH (UPDLOCK, HOLDLOCK)`. Eliminó el error inmediato pero introdujo bloqueos de rango: una ejecución tardó **678 s** con un `HYT00` y otra **38 s**. Se corrigió con `INSERT` + captura de clave duplicada (suite: ≈ 10 s). Ver `evidencia/fallas/falla_1/`.
 2. **Prueba de seguridad que "pasaba" por la razón equivocada.** Una prueba adversarial llamaba a `anular_transaccion` con argumentos inexistentes; el error de firma la hacía pasar sin ejercitar la guarda de aprobación. Ver `falla_3`.
 3. **Esquema entregado como `.sql`.** La primera versión del changelog eran archivos `.sql`; no cumplía lo que pedí (YAML) y se rehízo como `changeSet` nativos.
-4. **Smoke test sin el entorno correcto.** En la verificación final, `scripts/smoke_test.py` fallaba porque no activaba `DEMO_MODE` (no podía leer el OTP simulado) y, con el proveedor *mock*, la colección de Qdrant Cloud (1536 dimensiones) rechazaba los vectores del mock (256): hubo que corregir el script y ejecutar el *mock* con Qdrant local.
+4. **Smoke test sin el entorno correcto.** En la verificación final, `scripts/smoke_test.py` fallaba porque no activaba `DEMO_MODE` (no podía leer el OTP simulado, que después se eliminó) y, con el proveedor *mock*, la colección de Qdrant Cloud (1536 dimensiones) rechazaba los vectores del mock (256): hubo que corregir el script y hacer que el *mock* use siempre Qdrant local.
 5. **Supuestos erróneos sobre el contrato interno.** Las primeras pruebas esperaban nombres de respuesta que no existían (`ESCALAR_OPERADOR`, `ESTADO_RECLAMO`) y un helper de imágenes generaba rectángulos inválidos (`ValueError: x1 must be greater than or equal to x0`; ver `falla_2`).
+6. **Prompt de visión con un valor de ejemplo que el modelo copió.** El prompt `vision_constancia_v1` que escribió el asistente mostraba `"confianza": 0.0` como ejemplo de JSON. En una corrida real, `gpt-5-mini` devolvió exactamente `0.0`, el validador marcó `CONFIANZA_DE_EXTRACCION_BAJA` y el *smoke test* falló en el ciclo HITL (el caso fue a `PEDIR_INFO`). Los logs paso a paso (`temporal/`, que yo pedí) mostraron la causa; se corrigió el prompt (v1.0.1) y el validador. Con el *mock* esto nunca se vio: solo apareció con el modelo real.
 
-**Lo que sigue sin verificar:** la calidad real de Whisper y TTS (sin *deployments*), la ejecución de Liquibase real y la calidad de la extracción de la visión más allá de las tres ejecuciones con `gpt-5-mini` registradas en `evidencia/resumen_metricas_azure.md`.
+**Lo que sigue sin verificar:** la calidad (WER) y el costo de STT/TTS, la ejecución de Liquibase real y la calidad de la extracción de la visión más allá de las ejecuciones con `gpt-5-mini` registradas en `evidencia/resumen_metricas_azure.md` y en el *smoke test*.

@@ -18,6 +18,8 @@ from reclamos.escenario.artefactos import generar_artefactos  # noqa: E402
 from reclamos.proveedores.interfaces import obtener_proveedor  # noqa: E402
 
 if __name__ == "__main__":
+    from reclamos.observabilidad.otel import iniciar_registro
+    iniciar_registro("generar_datos")
     s = get_settings()
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--caso-id", default=s.caso_id)

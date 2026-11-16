@@ -1,15 +1,17 @@
-Prueba de humo — 2026-11-16 — CASO_ID=C-07 SEMILLA=4213
-Comando: python scripts/smoke_test.py   (PROVEEDOR_IA=mock; Azure SQL real; Qdrant local embebido)
+﻿Prueba de humo - 2026-11-16 - CASO_ID=C-07 SEMILLA=4213
+Comando: python scripts/smoke_test.py   (PROVEEDOR_IA=azure: gpt-5-mini, MAI-Transcribe-1.5, MAI-Voice-2; Azure SQL y Qdrant Cloud reales)
 
-[ok] conexión a SQL (free-sql-db-9472607); proveedor IA = mock
-[ok] DUPLICADA              esperado=REEMBOLSO            obtenido=PENDIENTE_APROBACION   69182 ms  trace=a4e5b793
-[ok] SIN_CONSENTIMIENTO     esperado=REEMBOLSO            obtenido=PENDIENTE_APROBACION   54873 ms  trace=03e90777
-[ok] MONTO_DISCREPANTE      esperado=ESCALAR_OPERADOR     obtenido=ESCALADO_DISCREPANCIA  73795 ms  trace=13796450
-[ok] TARJETA_DESHABILITADA  esperado=ESCALAR_OPERADOR     obtenido=ESCALADO_TARJETA       88912 ms  trace=2f5d4649
-[ok] SIN_EVIDENCIA          esperado=PEDIR_INFO           obtenido=PEDIR_INFO             84774 ms  trace=e515f934
-[ok] AJENA                  esperado=RECHAZAR             obtenido=RECHAZO_AJENA          73853 ms  trace=bb897e6f
-[ok] MONEDA_USD             esperado=NO_DISPONIBLE_MONEDA obtenido=NO_DISPONIBLE_MONEDA   62844 ms  trace=59d21085
+[log] paso a paso en .\temporal\smoke_test_2026-11-16_08-46-17.log
+[ok] conexión a SQL (dbtestgt.database.windows.net/free-sql-db-9472607); proveedor IA = azure
+[ok] DUPLICADA              esperado=REEMBOLSO            obtenido=PENDIENTE_APROBACION   54683 ms  trace=71ae09e1
+[ok] SIN_CONSENTIMIENTO     esperado=REEMBOLSO            obtenido=PENDIENTE_APROBACION   59058 ms  trace=0495c4dc
+[ok] MONTO_DISCREPANTE      esperado=ESCALAR_OPERADOR     obtenido=ESCALADO_DISCREPANCIA  71268 ms  trace=10af9bd8
+[ok] TARJETA_DESHABILITADA  esperado=ESCALAR_OPERADOR     obtenido=ESCALADO_TARJETA       60018 ms  trace=bdefb934
+[ok] SIN_EVIDENCIA          esperado=PEDIR_INFO           obtenido=PEDIR_INFO             61221 ms  trace=34f9ec04
+[ok] AJENA                  esperado=RECHAZAR             obtenido=RECHAZO_AJENA          69326 ms  trace=0e14cdd0
+[ok] MONEDA_USD             esperado=NO_DISPONIBLE_MONEDA obtenido=NO_DISPONIBLE_MONEDA   73113 ms  trace=83a320bb
 [ok] HITL aprobar -> reanuda desde checkpoint -> REEMBOLSO
 RESULTADO: OK
+[log] .\temporal\smoke_test_2026-11-16_08-46-17.log
 
-Nota: las latencias (55–90 s) se deben a los viajes a Azure SQL (capa gratuita serverless); con SQL simulado el mismo flujo tarda ≈ 0.4 s.
+Nota: las latencias (50-75 s) se deben sobre todo a los viajes a Azure SQL (capa gratuita serverless: cada commit del checkpoint tarda ~3 s) y a las llamadas a gpt-5-mini; el paso a paso de cada llamada queda en temporal/smoke_test_<fecha-hora>.log (no se versiona).

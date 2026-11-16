@@ -19,7 +19,6 @@ from ..memoria.checkpointer import crear_checkpointer
 from ..observabilidad.otel import configurar, fijar_caso, metrica, trace_id_actual, trazar, volcar_metricas
 from ..proveedores.interfaces import ProveedorIA, obtener_proveedor
 from ..rag.retriever import RetrieverPoliticas
-from ..seguridad.otp import emitir_otp, registrar_login
 from .base import Contexto
 from .grafo import construir_grafo
 from .respuestas import texto_para
@@ -60,13 +59,15 @@ class ProcesadorReclamos:
         if not db.uno("SELECT 1 AS x FROM Cliente WHERE cliente_id = ?", (cliente_id,)):
             raise ServicioError("CLIENTE_INEXISTENTE", f"No existe el cliente {cliente_id}")
         sesion_id = "SES-" + uuid.uuid4().hex[:10].upper()
+        log.debug("sesión nueva: caso=%s/%s cliente=%s canal=%s", caso_id, semilla, cliente_id, canal)
         with trazar("sesion.iniciar", **{"sesion_id": sesion_id, "cliente_id": cliente_id}):
-            otp = emitir_otp(cliente_id, sesion_id, caso_id, semilla, canal)
+            db.ejecutar("INSERT INTO Sesion (sesion_id, cliente_id, canal) VALUES (?, ?, ?)",
+                        (sesion_id, cliente_id, canal))
         log.info("sesión %s iniciada para %s", sesion_id, cliente_id)
-        return {"sesion_id": sesion_id, "cliente_id": cliente_id, "caso_id": caso_id, "semilla": semilla, **otp}
+        return {"sesion_id": sesion_id, "cliente_id": cliente_id, "caso_id": caso_id, "semilla": semilla}
 
     def _sesion(self, sesion_id: str) -> tuple[str, str, int]:
-        f = db.uno("SELECT TOP 1 cliente_id FROM OtpChallenge WHERE sesion_id = ? ORDER BY creado_en", (sesion_id,))
+        f = db.uno("SELECT cliente_id FROM Sesion WHERE sesion_id = ?", (sesion_id,))
         if not f:
             raise ServicioError("SESION_INEXISTENTE", f"No existe la sesión {sesion_id}")
         p = {x["clave"]: x["valor"] for x in db.consultar("SELECT clave, valor FROM ParametroEscenario")}
@@ -74,27 +75,29 @@ class ProcesadorReclamos:
 
     # ------------------------------------------------------------------------------------------
     def procesar(self, sesion_id: str, texto: str | None = None, audio_path: str | Path | None = None,
-                 imagen_path: str | Path | None = None, otp: str | None = None,
-                 idem_key: str | None = None) -> dict[str, Any]:
+                 imagen_path: str | Path | None = None, idem_key: str | None = None) -> dict[str, Any]:
         cliente_id, caso_id, semilla = self._sesion(sesion_id)
         fijar_caso(caso_id, semilla)
         entrada = {
             "caso_id": caso_id, "semilla": semilla, "sesion_id": sesion_id, "cliente_id": cliente_id,
             "idem_key": idem_key, "texto": texto, "audio_path": str(audio_path) if audio_path else None,
-            "imagen_path": str(imagen_path) if imagen_path else None, "otp_codigo": otp,
+            "imagen_path": str(imagen_path) if imagen_path else None,
         }
         config = {"configurable": {"thread_id": sesion_id}}
         t0 = time.perf_counter()
         with trazar("reclamo.procesar", **{"sesion_id": sesion_id, "cliente_id": cliente_id,
                                            "entrada.audio": bool(audio_path), "entrada.imagen": bool(imagen_path),
                                            "entrada.texto": bool(texto)}) as sp:
-            log.info("inicio de ejecución sesión=%s", sesion_id)
+            log.info("inicio de ejecución sesión=%s (audio=%s, imagen=%s, texto=%s)", sesion_id,
+                     Path(audio_path).name if audio_path else "no", Path(imagen_path).name if imagen_path else "no",
+                     "sí" if texto else "no")
             self.grafo.invoke(entrada, config)
             return self._resultado(config, sp, t0, sesion_id)
 
     def resolver_hitl(self, aprobacion_id: str, decision: str, motivo: str, aprobador: str,
                       aprobador_rol: str = "ANALISTA") -> dict[str, Any]:
         """El humano decide (aprobar/rechazar) y el grafo se REANUDA desde el checkpoint en Azure SQL."""
+        log.info("HITL: el analista %s (%s) decide %s sobre %s", aprobador, aprobador_rol, decision, aprobacion_id)
         ap = hitl.resolver_aprobacion(aprobacion_id, decision, motivo, aprobador, aprobador_rol)
         return self._reanudar(ap)
 
@@ -106,6 +109,8 @@ class ProcesadorReclamos:
         t = db.uno("SELECT thread_id, caso_id, semilla FROM Ticket WHERE ticket_id = ?", (ap["ticket_id"],))
         fijar_caso(t["caso_id"], t["semilla"])
         config = {"configurable": {"thread_id": t["thread_id"]}}
+        log.info("reanudando el hilo %s desde el checkpoint (ticket %s, aprobación %s)", t["thread_id"],
+                 ap["ticket_id"], ap["aprobacion_id"])
         t0 = time.perf_counter()
         with trazar("reclamo.reanudar_hitl", **{"ticket_id": ap["ticket_id"],
                                                  "hitl.aprobacion_id": ap["aprobacion_id"]}) as sp:

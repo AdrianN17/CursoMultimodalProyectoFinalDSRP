@@ -8,18 +8,18 @@ from __future__ import annotations
 import functools
 import hashlib
 import json
-import smtplib
+import logging
+import time
 from datetime import date, datetime, timedelta, timezone
-from email.message import EmailMessage
 from typing import Any, Callable
 
 import pyodbc
 
 from .. import db
-from ..config import get_settings
 from ..politicas.calendario import esta_facturada, sumar_dias_habiles
 from .dto import TransaccionAjenaDTO, TransaccionDTO
 
+log = logging.getLogger("reclamos.tools")
 REGISTRO: dict[str, Callable[..., dict]] = {}
 ESTADOS_TICKET = {"ABIERTO", "EN_ANALISIS", "PENDIENTE_APROBACION", "EN_ESCALAMIENTO", "PENDIENTE_TECNICO", "CERRADO"}
 RESOLUCIONES = {"REEMBOLSO", "ANULACION", "RECHAZADO", "INFORMATIVO", "ESCALADO", "EXPIRADO"}
@@ -36,14 +36,21 @@ class ToolError(Exception):
 def herramienta(fn: Callable[..., dict]) -> Callable[..., dict]:
     @functools.wraps(fn)
     def envoltura(*args: Any, **kwargs: Any) -> dict:
+        t0 = time.perf_counter()
         try:
-            return {"ok": True, "data": fn(*args, **kwargs)}
+            res = {"ok": True, "data": fn(*args, **kwargs)}
+            log.debug("tool %s ejecutada en %.0f ms", fn.__name__, (time.perf_counter() - t0) * 1000)
+            return res
         except ToolError as e:
+            log.info("tool %s rechazó la operación: %s - %s", fn.__name__, e.codigo, e.mensaje[:160])
             return {"ok": False, "error": {"codigo": e.codigo, "mensaje": e.mensaje}}
         except pyodbc.Error as e:
+            log.warning("tool %s: error de base de datos tras %.0f ms: %s", fn.__name__,
+                        (time.perf_counter() - t0) * 1000, str(e)[:200])
             return {"ok": False, "error": {"codigo": "DB_ERROR", "mensaje": f"{type(e).__name__}: {str(e)[:160]}",
                                            "reintentable": True}}
-        except Exception as e:  # nunca se filtra una traza al agente
+        except Exception as e:  # nunca se filtra una traza al agente (queda en el log del servidor)
+            log.exception("tool %s: error interno (%s)", fn.__name__, type(e).__name__)
             return {"ok": False, "error": {"codigo": "ERROR_INTERNO", "mensaje": type(e).__name__}}
 
     REGISTRO[fn.__name__] = envoltura
@@ -103,7 +110,7 @@ def consultar_parametros() -> dict[str, Any]:
 
 @herramienta
 def consultar_cliente(cliente_id: str, trace_id: str = "") -> dict[str, Any]:
-    """Datos básicos ENMASCARADOS del cliente y sus tarjetas (solo tras verificar OTP)."""
+    """Datos básicos ENMASCARADOS del cliente y sus tarjetas."""
     with db.conexion() as cn:
         c = db.uno("SELECT cliente_id, nombre_mask, email_mask, segmento, estado FROM Cliente WHERE cliente_id = ?",
                    (cliente_id,), cn)
@@ -350,36 +357,17 @@ def registrar_reembolso(ticket_id: str, transaccion_id: str, aprobacion_id: str,
 
 @herramienta
 def escalar_operador(ticket_id: str, motivo: str, resumen: str, trace_id: str = "") -> dict[str, Any]:
-    """Escala a un operador por correo (patrón outbox: se persiste siempre; el SMTP es opcional)."""
-    s = get_settings()
-    asunto = f"[{ticket_id}] Escalamiento: {motivo[:80]}"
+    """Deja el ticket en escalamiento para que lo atienda un operador (idempotente por ticket y motivo)."""
     with db.conexion() as cn:
         _ticket(cn, ticket_id)
-        previo = db.uno("SELECT email_id, estado FROM EmailOutbox WHERE ticket_id = ? AND asunto = ?",
-                        (ticket_id, asunto), cn)
+        previo = db.uno("SELECT 1 AS x FROM TicketEvento WHERE ticket_id = ? AND tipo = 'ESCALADO_A_OPERADOR'",
+                        (ticket_id,), cn)
         if previo:
-            return {"email_id": previo["email_id"], "estado": previo["estado"], "repetido": True}
-        db.ejecutar("INSERT INTO EmailOutbox (ticket_id, destino, asunto, cuerpo) VALUES (?, ?, ?, ?)",
-                    (ticket_id, s.operador_email, asunto, resumen), cn)
-        email = db.uno("SELECT MAX(email_id) AS id FROM EmailOutbox WHERE ticket_id = ?", (ticket_id,), cn)
+            return {"ticket_id": ticket_id, "estado": "EN_ESCALAMIENTO", "repetido": True}
         db.ejecutar("UPDATE Ticket SET estado = 'EN_ESCALAMIENTO', resolucion = 'ESCALADO', "
                     "actualizado_en = SYSUTCDATETIME() WHERE ticket_id = ?", (ticket_id,), cn)
-        _evento(cn, ticket_id, "ESCALADO_A_OPERADOR", {"motivo": motivo, "destino": s.operador_email}, "agente",
-                trace_id)
-        estado = "PENDIENTE"
-        if s.smtp_host:
-            try:
-                msg = EmailMessage()
-                msg["From"], msg["To"], msg["Subject"] = "reclamos@ejemplo.test", s.operador_email, asunto
-                msg.set_content(resumen)
-                with smtplib.SMTP(s.smtp_host, s.smtp_port, timeout=3) as smtp:
-                    smtp.send_message(msg)
-                estado = "ENVIADO"
-            except OSError:
-                estado = "ERROR"
-            db.ejecutar("UPDATE EmailOutbox SET estado = ?, enviado_en = CASE WHEN ? = 'ENVIADO' THEN "
-                        "SYSUTCDATETIME() END WHERE email_id = ?", (estado, estado, email["id"]), cn)
-    return {"email_id": email["id"], "estado": estado, "repetido": False}
+        _evento(cn, ticket_id, "ESCALADO_A_OPERADOR", {"motivo": motivo, "resumen": resumen}, "agente", trace_id)
+    return {"ticket_id": ticket_id, "estado": "EN_ESCALAMIENTO", "repetido": False}
 
 
 @herramienta

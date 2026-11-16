@@ -37,8 +37,18 @@ class ResultadoConstancia:
         return d
 
 
+def _confianza(valor: object) -> float | None:
+    """Confianza numérica 0..1; si el modelo devuelve texto u otro valor no numérico, se trata como 'sin dato'."""
+    if isinstance(valor, bool) or not isinstance(valor, (int, float, str)):
+        return None
+    try:
+        return float(valor)
+    except ValueError:
+        return None
+
+
 def validar_constancia(d: dict, confianza_minima: float = 0.4) -> ResultadoConstancia:
-    r = ResultadoConstancia(valida=False, confianza=d.get("confianza"))
+    r = ResultadoConstancia(valida=False, confianza=_confianza(d.get("confianza")))
     if not d.get("es_constancia_pago"):
         r.errores.append("NO_ES_CONSTANCIA_DE_PAGO")
         return r

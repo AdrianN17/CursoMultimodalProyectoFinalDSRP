@@ -11,6 +11,7 @@ Uso:  python scripts/aplicar_esquema.py [--reset] [--sql]
 from __future__ import annotations
 
 import argparse
+import logging
 import sys
 from pathlib import Path
 
@@ -21,6 +22,8 @@ sys.path.insert(0, str(RAIZ / "src"))
 
 from reclamos import db  # noqa: E402
 from reclamos.config import get_settings  # noqa: E402
+
+log = logging.getLogger("reclamos.esquema")
 
 CHANGELOG = RAIZ / "db" / "changelog" / "db.changelog-master.yaml"
 
@@ -132,6 +135,7 @@ def resetear() -> None:
             (esquema,)).fetchall()
         for fila in tablas:
             cn.cursor().execute(f"DROP TABLE {_t(fila.name)}")
+    log.info("esquema '%s' reiniciado: %d claves foráneas y %d tablas eliminadas", esquema, len(fks), len(tablas))
     print(f"Esquema '{esquema}' reiniciado (solo sus tablas).")
 
 
@@ -156,11 +160,14 @@ def aplicar(solo_imprimir: bool = False) -> None:
         for item in _cargar(CHANGELOG):
             cs = item["changeSet"]
             if cs["id"] in hechos:
+                log.info("changeSet %s ya aplicado", cs["id"])
                 print(f"= {cs['id']} (ya aplicado)")
                 continue
+            log.info("aplicando changeSet %s", cs["id"])
             for cambio in cs["changes"]:
                 (tipo, args), = cambio.items()
                 for sentencia, params in _sentencias_cambio(tipo, args):
+                    log.debug("  %s: %s", tipo, " ".join(sentencia.split())[:100])
                     cn.cursor().execute(sentencia, params)
             cn.cursor().execute(f"INSERT INTO {control} (id) VALUES (?)", (cs["id"],))
             print(f"+ {cs['id']}")
@@ -171,6 +178,8 @@ if __name__ == "__main__":
     ap.add_argument("--reset", action="store_true", help="elimina las tablas del esquema del proyecto antes de aplicar")
     ap.add_argument("--sql", action="store_true", help="solo imprime el T-SQL equivalente (no toca la BD)")
     args = ap.parse_args()
+    from reclamos.observabilidad.otel import iniciar_registro
+    iniciar_registro("aplicar_esquema")
     if args.sql:
         aplicar(solo_imprimir=True)
         sys.exit(0)

@@ -37,7 +37,7 @@ flowchart TD
   A[validar_entrada] --> B{audio?}
   B -- sí --> C[stt] --> D
   B -- no --> D[clasificar_intencion]
-  D --> E[verificar_otp] --> F{router_entrada}
+  D --> F{router}
   F -- consulta de estado --> S[consultar_estado]
   F -- reclamo --> V[vision_constancia] --> T[abrir_ticket] --> M[consultar_maestro]
   M --> X[cruzar_evidencias] --> P[evaluar_politicas] --> R[recuperar_politica] --> AG[analizar_agente]
@@ -53,11 +53,11 @@ flowchart TD
   A -. error .-> ERR[responder_error] --> TTS
 ```
 
-El OTP se verifica **antes** de la visión: no se gasta cómputo ni se expone nada a un usuario no autenticado.
+No hay verificación de identidad por OTP ni envío de correos: la sesión identifica al cliente y un escalamiento deja el ticket en `EN_ESCALAMIENTO` (evento `ESCALADO_A_OPERADOR`). Las aprobaciones humanas se dan por la web del analista o por consola (`scripts/hitl_cli.py decidir …`), y reanudan el flujo desde el checkpoint.
 
 ### Señal de fraude: operación con / sin OTP (P-11)
 
-`Transaccion.autenticada_otp` (changeSet `009`) es **dato maestro**: indica si la operación original se confirmó con el OTP del cliente. No es el OTP del formulario (ese autentica a quien reclama; ver `seguridad/otp.py`).
+`Transaccion.autenticada_otp` (changeSet `009`) es **dato maestro**: indica si la operación original se confirmó con el OTP del cliente. Es solo un dato de la BD: el sistema no emite ni verifica OTP.
 Cuando el cliente **desconoce** una operación (`SIN_CONSENTIMIENTO`), `politicas/motor.py` decide:
 
 | `autenticada_otp` | Decisión | Motivo |
@@ -72,7 +72,7 @@ Datos de prueba: `db/datos_prueba_fraude_otp.sql` (`python scripts/cargar_datos_
 | # | Capa | Implementación |
 |---|---|---|
 | 1 | Entrada multimodal | `api/app.py` (multipart), `modalidades/validacion_archivos.py` (magic bytes, tamaño, rechazo de video) |
-| 2 | Percepción | `ProveedorIA.transcribir` / `extraer_constancia` (Whisper, visión) |
+| 2 | Percepción | `ProveedorIA.transcribir` / `extraer_constancia` (MAI-Transcribe, visión) |
 | 3 | Validación | `validadores/constancia.py` (formato oficial, soles/USD, 4–5 dígitos finales) |
 | 4 | Dato maestro | `mcp_server/tools.py` (14 tools con envoltorio `{ok, data|error}`) |
 | 5 | Conocimiento | `rag/` (Qdrant; políticas versionadas; recuperación obligatoria de P-xx del motor) |
@@ -102,10 +102,10 @@ Datos de prueba: `db/datos_prueba_fraude_otp.sql` (`python scripts/cargar_datos_
 
 ## 7. Límites conocidos
 
-- Autenticación real (el OTP es de demostración), antifraude y detección de comprobantes falsificados no están implementados.
+- Autenticación real del cliente (la sesión es anónima), antifraude y detección de comprobantes falsificados no están implementados.
 - Constancia solo en imagen (PNG/JPG); sin PDF ni multi-idioma.
 - Todas las tablas (negocio, tickets, checkpoints) viven en el esquema `multimodal` (`AZURE_SQL_SCHEMA`), no en `dbo`; ver D15 del diario y `reclamos/db.py`.
 - Qdrant en modo local admite un solo proceso; para producción use `QDRANT_URL` (Qdrant Cloud) y `QDRANT_API_KEY`. Con `PROVEEDOR_IA=mock` el código usa **siempre** Qdrant local (`QDRANT_PATH`), aunque haya `QDRANT_URL`, para que los embeddings *mock* (256 dim) no toquen la colección real (1536 dim).
 - `pytest` fuerza Qdrant local (`.qdrant_test/`) y SQL simulado.
 - El runner Liquibase en Docker no se pudo ejecutar en el entorno de desarrollo (sin Docker/Java): el esquema se validó con `scripts/aplicar_esquema.py` sobre el mismo changelog.
-- La ruta Azure OpenAI (`proveedores/azure_openai.py`) se ejecutó **parcialmente** (chat, visión y embeddings con `gpt-5-mini` / `text-embedding-3-small`; ver `evidencia/pruebas/resultado_azure_parcial.txt`). Whisper y TTS no se han probado: sus *deployments* no existen en Foundry (`DeploymentNotFound`).
+- La ruta Azure (`proveedores/azure_openai.py`) se ejecutó de punta a punta: chat y visión con `gpt-5-mini`, embeddings, STT con MAI-Transcribe-1.5 y TTS con MAI-Voice-2 (smoke test completo en `evidencia/pruebas/resultado_smoke_test.txt`; fidelidad del STT en `resultado_azure_voz.txt`). Falta medir el costo de STT/TTS.

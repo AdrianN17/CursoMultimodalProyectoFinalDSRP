@@ -10,9 +10,11 @@ import sys
 
 from mcp.server.fastmcp import FastMCP
 
+from ..observabilidad.otel import iniciar_registro
 from . import tools
 
 logging.basicConfig(stream=sys.stderr, level=logging.WARNING)
+iniciar_registro("mcp_server")  # hereda REGISTRO_ARCHIVO del proceso padre: mismo fichero en temporal/
 
 mcp = FastMCP("reclamos-bancarios")
 

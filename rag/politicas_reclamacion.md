@@ -1,4 +1,4 @@
-<!-- version: 1.1.0 -->
+<!-- version: 1.2.0 -->
 # Políticas de reclamación de consumos y operaciones con tarjeta
 
 Documento normativo (ficticio) que respalda las decisiones del agente. Cada política tiene un identificador
@@ -29,11 +29,11 @@ ejecutado, cualquier otra solicitud se rechaza y se debe abrir un nuevo reclamo.
 ## P-06 · Tarjeta no habilitada
 Un cliente **no puede recibir reembolso** si no tiene **habilitada** la tarjeta con la que hizo la compra.
 Debe pasar a un **operador** para coordinar el medio de reembolso (tarjeta de débito u otra tarjeta). El
-operador es notificado por correo y el ticket queda en escalamiento.
+operador es asignado al ticket, que queda en escalamiento.
 
 ## P-07 · Información al cliente
-Se puede dar información del usuario y el detalle de la transacción **solo después de verificar la identidad
-con OTP**, y siempre con datos enmascarados (nunca número completo de tarjeta ni documento).
+Se puede dar información del usuario y el detalle de la transacción **solo del propio cliente**, y siempre con
+datos enmascarados (nunca número completo de tarjeta ni documento).
 
 ## P-08 · Ticket de atención idempotente
 Por cada atención se genera **un ticket**, que es **idempotente**: reintentar la misma solicitud devuelve el

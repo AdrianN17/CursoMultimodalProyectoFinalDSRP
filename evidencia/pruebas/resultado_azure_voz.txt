@@ -1,0 +1,13 @@
+Voz real con Azure Speech (Foundry) — 2026-11-16 — CASO_ID=C-07 SEMILLA=4213
+STT: MAI-Transcribe-1.5 (speechtotext/transcriptions:transcribe, api-version 2025-10-15)
+TTS: MAI-Voice-2, voz es-ES-Marta:MAI-Voice-2 (tts/cognitiveservices/v1, mp3 24 kHz)
+
+Comando: python main.py --caso-id C-07 --semilla 4213 --tipo DUPLICADA --aprobar APROBADA   (PROVEEDOR_IA=azure)
+  - El audio del cliente (datos/reporte.mp3) se generó con MAI-Voice-2 a partir del relato del escenario.
+  - Resultado: PENDIENTE_APROBACION (59.4 s) -> HITL aprobada -> REEMBOLSO_PROGRAMADO, accion_final=REEMBOLSO (reanudación 21.2 s).
+  - La respuesta al cliente se entregó como audio mp3 (MAI-Voice-2).
+
+Fidelidad del STT sobre ese mp3:
+  Original : "Hola, me cobraron dos veces la misma compra en Nube Market por S/ 2,222.59. Adjunto mi constancia de pago. Quiero que me devuelvan el dinero."
+  STT      : "Hola, me cobraron dos veces la misma compra en Nube Market por 2.222 soles peruanos con 59 céntimos. Adjunto mi constancia de pago. Quiero que me devuelvan el dinero."
+  (el monto se transcribe en palabras; el monto autoritativo sale siempre de la BD)

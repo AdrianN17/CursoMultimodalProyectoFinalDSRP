@@ -5,6 +5,7 @@ import hmac
 import json
 import logging
 import os
+import time
 import uuid
 from contextlib import asynccontextmanager
 from pathlib import Path
@@ -41,8 +42,12 @@ def servicio() -> ProcesadorReclamos:
 @asynccontextmanager
 async def ciclo_vida(_: FastAPI):
     configurar()
+    log.info("API iniciando: proveedor IA=%s, transporte MCP=%s, modo demo=%s", get_settings().proveedor,
+             get_settings().mcp_transport, get_settings().demo_mode)
     servicio()
+    log.info("API lista")
     yield
+    log.info("API deteniéndose")
     if _servicio:
         _servicio.cerrar()
 
@@ -50,6 +55,20 @@ async def ciclo_vida(_: FastAPI):
 app = FastAPI(title="Agente de reclamos bancarios multimodal", version=AGENTE_VERSION, lifespan=ciclo_vida,
               description="Recibe audio + constancia de pago, decide con políticas y herramientas MCP, "
                           "pide aprobación humana para acciones monetarias y responde solo en audio.")
+
+
+@app.middleware("http")
+async def _registrar_peticion(request: Request, call_next):
+    t0 = time.perf_counter()
+    try:
+        respuesta = await call_next(request)
+    except Exception:
+        log.exception("HTTP %s %s terminó con excepción", request.method, request.url.path)
+        raise
+    nivel = logging.INFO if request.url.path.startswith(PREFIJO) else logging.DEBUG  # la web estática va a DEBUG
+    log.log(nivel, "HTTP %s %s -> %s en %.0f ms", request.method, request.url.path, respuesta.status_code,
+            (time.perf_counter() - t0) * 1000)
+    return respuesta
 
 
 # ----------------------------------------------------------------------------- errores problem+json
@@ -148,24 +167,21 @@ def health():
 
 
 @app.post(f"{PREFIJO}/sesiones", status_code=201, tags=["reclamos"],
-          summary="Inicia sesión y emite el OTP (el canal real lo enviaría por SMS/correo)")
+          summary="Inicia una sesión para el cliente del escenario cargado")
 def crear_sesion(body: SesionIn | None = None):
     b = body or SesionIn()
-    ses = servicio().iniciar_sesion(b.caso_id, b.semilla)
-    if not get_settings().demo_mode:
-        ses.pop("otp_demo", None)
-    return ses
+    return servicio().iniciar_sesion(b.caso_id, b.semilla)
 
 
-@app.post(f"{PREFIJO}/reclamos", tags=["reclamos"], summary="Envía un turno: audio y/o imagen y/o texto + OTP")
-async def crear_reclamo(sesion_id: str = Form(...), otp: str | None = Form(default=None),
+@app.post(f"{PREFIJO}/reclamos", tags=["reclamos"], summary="Envía un turno: audio y/o imagen y/o texto")
+async def crear_reclamo(sesion_id: str = Form(...),
                         texto: str | None = Form(default=None), audio: UploadFile | None = File(default=None),
                         imagen: UploadFile | None = File(default=None),
                         idempotency_key: str | None = Header(default=None)):
     a = await guardar_subida(audio, EXT_AUDIO, "audio") if audio and audio.filename else None
     i = await guardar_subida(imagen, EXT_IMAGEN, "imagen") if imagen and imagen.filename else None
     from starlette.concurrency import run_in_threadpool
-    res = await run_in_threadpool(servicio().procesar, sesion_id, texto, a, i, otp, idempotency_key)
+    res = await run_in_threadpool(servicio().procesar, sesion_id, texto, a, i, idempotency_key)
     return _publico(res)
 
 

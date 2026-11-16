@@ -29,10 +29,12 @@ class Settings:
     azure_api_version: str
     dep_chat: str
     dep_router: str
-    dep_stt: str
-    dep_tts: str
     dep_embed: str
-    tts_voz: str
+    speech_endpoint: str  # Azure Speech / Foundry (cognitiveservices.azure.com): MAI-Transcribe y MAI-Voice
+    speech_key: str
+    speech_voz: str
+    stt_modelo: str
+    stt_api_version: str
     sql_server: str
     sql_database: str
     sql_schema: str  # esquema propio del proyecto dentro de la BD ("" = esquema por defecto del usuario)
@@ -46,9 +48,7 @@ class Settings:
     qdrant_coleccion: str
     otel_endpoint: str
     evidencia_dir: Path
-    smtp_host: str
-    smtp_port: int
-    operador_email: str
+    temporal_dir: Path  # un fichero de log con fecha por cada ejecución (ver observabilidad.otel.iniciar_registro)
     hitl_timeout_horas: float
     max_upload_mb: int
     demo_mode: bool
@@ -75,11 +75,19 @@ class Settings:
         return ";".join(partes) + ";"
 
 
+def _endpoint_voz(endpoint_openai: str) -> str:
+    """Speech vive en <recurso>.cognitiveservices.azure.com; el endpoint de OpenAI usa <recurso>.openai.azure.com."""
+    return endpoint_openai.replace(".openai.azure.com", ".cognitiveservices.azure.com")
+
+
 def get_settings() -> Settings:
     e = os.environ.get
     evidencia = Path(e("EVIDENCIA_DIR", str(RAIZ / "evidencia")))
     if not evidencia.is_absolute():
         evidencia = RAIZ / evidencia
+    temporal = Path(e("TEMPORAL_DIR") or str(RAIZ / "temporal"))
+    if not temporal.is_absolute():
+        temporal = RAIZ / temporal
     return Settings(
         caso_id=e("CASO_ID", "C-07"),
         semilla=int(e("SEMILLA", "4213")),
@@ -89,10 +97,12 @@ def get_settings() -> Settings:
         azure_api_version=e("AZURE_OPENAI_API_VERSION", "2024-10-21"),
         dep_chat=e("AZURE_OPENAI_DEPLOYMENT_CHAT", "gpt-4o"),
         dep_router=e("AZURE_OPENAI_DEPLOYMENT_ROUTER", "gpt-4o-mini"),
-        dep_stt=e("AZURE_OPENAI_DEPLOYMENT_STT", "whisper"),
-        dep_tts=e("AZURE_OPENAI_DEPLOYMENT_TTS", "tts"),
         dep_embed=e("AZURE_OPENAI_DEPLOYMENT_EMBED", "text-embedding-3-small"),
-        tts_voz=e("TTS_VOZ", "alloy"),
+        speech_endpoint=(e("AZURE_SPEECH_ENDPOINT") or _endpoint_voz(e("AZURE_OPENAI_ENDPOINT", ""))).rstrip("/"),
+        speech_key=e("AZURE_SPEECH_KEY") or e("AZURE_OPENAI_API_KEY", ""),
+        speech_voz=e("AZURE_SPEECH_VOZ", "es-ES-Marta:MAI-Voice-2"),
+        stt_modelo=e("AZURE_STT_MODELO", "mai-transcribe-1.5"),
+        stt_api_version=e("AZURE_STT_API_VERSION", "2025-10-15"),
         sql_server=e("AZURE_SQL_SERVER", ""),
         sql_database=e("AZURE_SQL_DATABASE", "reclamos"),
         sql_schema=e("AZURE_SQL_SCHEMA", "multimodal").strip(),
@@ -106,9 +116,7 @@ def get_settings() -> Settings:
         qdrant_coleccion=e("QDRANT_COLECCION", "politicas_reclamacion"),
         otel_endpoint=e("OTEL_EXPORTER_OTLP_ENDPOINT", ""),
         evidencia_dir=evidencia,
-        smtp_host=e("SMTP_HOST", ""),
-        smtp_port=int(e("SMTP_PORT", "1025")),
-        operador_email=e("OPERADOR_EMAIL", "operador@ejemplo.test"),
+        temporal_dir=temporal,
         hitl_timeout_horas=float(e("HITL_TIMEOUT_HORAS", "24")),
         max_upload_mb=int(e("MAX_UPLOAD_MB", "5")),
         demo_mode=_bool(e("DEMO_MODE"), False),

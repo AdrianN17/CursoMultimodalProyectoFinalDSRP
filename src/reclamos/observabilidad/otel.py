@@ -4,14 +4,19 @@
 - Exporta SIEMPRE a evidencia/trazas.jsonl (+ logs.jsonl y metricas.jsonl) y, si OTEL_EXPORTER_OTLP_ENDPOINT
   está definido, también por OTLP (collector/Jaeger).
 - `caso.id` y `caso.semilla` van en cada span y en cada log.
+- Cada ejecución (script, API, pruebas) escribe además un log detallado paso a paso en
+  temporal/<proceso>_<fecha-hora>.log (ver `iniciar_registro`); los subprocesos (servidor MCP, hitl_cli) añaden al mismo fichero.
 """
 from __future__ import annotations
 
 import contextvars
 import json
 import logging
+import os
+import re
 import sys
 import threading
+import time
 from contextlib import contextmanager
 from datetime import datetime, timezone
 from pathlib import Path
@@ -29,9 +34,12 @@ from ..config import AGENTE_VERSION, get_settings
 from ..seguridad.sanitizar_pii import enmascarar_texto, sanitizar
 
 LOGGER = logging.getLogger("reclamos")
+LOG_TRAZA = logging.getLogger("reclamos.traza")
+_PROFUNDIDAD: contextvars.ContextVar[int] = contextvars.ContextVar("prof_span", default=0)
 _CTX_CASO: contextvars.ContextVar[tuple[str, int] | None] = contextvars.ContextVar("ctx_caso", default=None)
 _LOCK = threading.Lock()
-_ESTADO: dict[str, Any] = {"listo": False, "meter_provider": None, "instrumentos": None}
+_ESTADO: dict[str, Any] = {"listo": False, "meter_provider": None, "instrumentos": None, "registro": False,
+                           "handlers": False}
 
 
 def fijar_caso(caso_id: str, semilla: int) -> None:
@@ -100,6 +108,65 @@ class _FormatoConsola(logging.Formatter):
         return f"[{caso}/{semilla} t={tid}] {record.levelname:<7} {enmascarar_texto(record.getMessage())}"
 
 
+class _FormatoArchivo(logging.Formatter):
+    """Línea legible para seguir la ejecución paso a paso (hora local, caso, traza, proceso, nivel y módulo)."""
+
+    def format(self, record: logging.LogRecord) -> str:
+        ctx = trace.get_current_span().get_span_context()
+        caso, semilla = caso_actual()
+        tid = f"{ctx.trace_id:032x}"[:8] if ctx.is_valid else "--------"
+        ts = datetime.fromtimestamp(record.created).strftime("%Y-%m-%d %H:%M:%S.%f")[:-3]
+        linea = (f"{ts} [{caso}/{semilla} t={tid} p={record.process}] {record.levelname:<7} "
+                 f"{record.name.removeprefix('reclamos.')}: {enmascarar_texto(record.getMessage())}")
+        if record.exc_info:
+            linea += "\n" + enmascarar_texto(self.formatException(record.exc_info))
+        return linea
+
+
+def _nombre_proceso() -> str:
+    arg0 = Path(sys.argv[0]) if sys.argv and sys.argv[0] else Path("")
+    nombre = arg0.stem
+    if nombre in ("", "__main__", "-c", "-m"):  # python -m pytest -> .../pytest/__main__.py
+        nombre = arg0.parent.name
+    return re.sub(r"[^\w.-]", "_", nombre) or "python"
+
+
+def ruta_registro() -> Path | None:
+    """Ruta del log de esta ejecución (None si aún no se inició)."""
+    r = os.environ.get("REGISTRO_ARCHIVO")
+    return Path(r) if r else None
+
+
+def iniciar_registro(nombre: str | None = None) -> Path:
+    """Abre (una vez por proceso) temporal/<nombre>_<AAAA-MM-DD_HH-MM-SS>.log con TODO el detalle (nivel DEBUG):
+    cada span (nodo, tool, LLM, RAG, STT/TTS), consultas SQL, llamadas HTTP y errores con traza.
+    La ruta se publica en REGISTRO_ARCHIVO: el servidor MCP y otros subprocesos añaden al mismo fichero."""
+    with _LOCK:
+        if _ESTADO["registro"]:
+            return Path(os.environ["REGISTRO_ARCHIVO"])
+        ruta_env = os.environ.get("REGISTRO_ARCHIVO")
+        if ruta_env:
+            ruta = Path(ruta_env)
+        else:
+            marca = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+            ruta = get_settings().temporal_dir / f"{nombre or _nombre_proceso()}_{marca}.log"
+            os.environ["REGISTRO_ARCHIVO"] = str(ruta)
+        ruta.parent.mkdir(parents=True, exist_ok=True)
+        h = logging.FileHandler(ruta, encoding="utf-8")
+        h.setLevel(logging.DEBUG)
+        h.setFormatter(_FormatoArchivo())
+        LOGGER.setLevel(logging.DEBUG)
+        LOGGER.propagate = False
+        LOGGER.addHandler(h)
+        http = logging.getLogger("httpx")  # llamadas a Azure OpenAI / Speech / Qdrant (sin cabeceras ni claves)
+        http.setLevel(logging.INFO)
+        http.propagate = False
+        http.addHandler(h)
+        _ESTADO["registro"] = True
+    LOGGER.info("registro iniciado: %s (pid=%s) argv=%s", ruta.name, os.getpid(), " ".join(sys.argv)[:200])
+    return ruta
+
+
 def configurar(servicio: str = "agente-reclamos", consola: bool = True) -> None:
     """Idempotente. Seguro de llamar desde API, CLI, pruebas y servidor MCP (que escribe SOLO en stderr)."""
     with _LOCK:
@@ -139,14 +206,18 @@ def configurar(servicio: str = "agente-reclamos", consola: bool = True) -> None:
     metrics.set_meter_provider(mp)
     _ESTADO["meter_provider"] = mp
 
-    LOGGER.setLevel(logging.INFO)
+    iniciar_registro()
+    LOGGER.setLevel(logging.DEBUG)
     LOGGER.propagate = False
-    if not LOGGER.handlers:
+    if not _ESTADO["handlers"]:
+        _ESTADO["handlers"] = True
         archivo = logging.FileHandler(s.evidencia_dir / "logs.jsonl", encoding="utf-8")
+        archivo.setLevel(logging.INFO)
         archivo.setFormatter(_FormatoJson())
         LOGGER.addHandler(archivo)
         if consola:
             c = logging.StreamHandler(sys.stderr)
+            c.setLevel(logging.INFO)
             c.setFormatter(_FormatoConsola())
             LOGGER.addHandler(c)
 
@@ -183,11 +254,13 @@ def metrica(nombre: str, valor: float, **atributos: Any) -> None:
 def trazar(nombre: str, **atributos: Any) -> Iterator[Span]:
     """Span con caso/semilla, atributos sanitizados, excepción registrada y métrica de latencia."""
     configurar()
-    import time
-
     caso, semilla = caso_actual()
     tracer = trace.get_tracer("reclamos")
     t0 = time.perf_counter()
+    prof = _PROFUNDIDAD.get()
+    marca = _PROFUNDIDAD.set(prof + 1)
+    sangria = "  " * prof
+    LOG_TRAZA.debug("%s-> %s", sangria, nombre)
     with tracer.start_as_current_span(nombre) as span:
         span.set_attribute("caso.id", caso)
         span.set_attribute("caso.semilla", semilla)
@@ -197,13 +270,22 @@ def trazar(nombre: str, **atributos: Any) -> Iterator[Span]:
         try:
             yield span
         except BaseException as exc:
-            if type(exc).__name__ != "GraphInterrupt":
+            if type(exc).__name__ == "GraphInterrupt":
+                LOG_TRAZA.debug("%s|| %s interrumpido: espera de aprobación humana", sangria, nombre)
+            else:
                 span.record_exception(exc)
                 span.set_status(Status(StatusCode.ERROR, str(exc)[:200]))
                 span.set_attribute("error.tipo", type(exc).__name__)
+                LOG_TRAZA.debug("%s!! %s falló: %s: %s", sangria, nombre, type(exc).__name__, str(exc)[:200])
             raise
         finally:
-            metrica("latencia", (time.perf_counter() - t0) * 1000, etapa=nombre)
+            ms = (time.perf_counter() - t0) * 1000
+            metrica("latencia", ms, etapa=nombre)
+            LOG_TRAZA.debug("%s<- %s %.1f ms", sangria, nombre, ms)
+            try:
+                _PROFUNDIDAD.reset(marca)
+            except ValueError:  # el span terminó en otro contexto (hilo): la sangría es solo cosmética
+                pass
 
 
 def poner_atributo(span: Span, clave: str, valor: Any) -> None:

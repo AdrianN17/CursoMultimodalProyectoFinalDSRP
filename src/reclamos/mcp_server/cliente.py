@@ -4,6 +4,7 @@ from __future__ import annotations
 import asyncio
 import inspect
 import json
+import logging
 import os
 import sys
 import threading
@@ -14,8 +15,10 @@ from typing import Any
 
 from ..config import get_settings
 from ..observabilidad.otel import poner_atributo, trace_id_actual, trazar
+from ..seguridad.sanitizar_pii import sanitizar
 from . import tools
 
+log = logging.getLogger("reclamos.mcp")
 ERRORES_TECNICOS = {"DB_ERROR", "ERROR_INTERNO", "MCP_TIMEOUT", "MCP_ERROR"}
 SRC = Path(__file__).resolve().parents[2]
 
@@ -37,10 +40,12 @@ class _PuenteStdio:
         entorno = {**os.environ, "PYTHONPATH": str(SRC) + os.pathsep + os.environ.get("PYTHONPATH", "")}
         params = StdioServerParameters(command=sys.executable, args=["-m", "reclamos.mcp_server.server"],
                                        env=entorno)
+        t0 = time.perf_counter()
         self._pila = AsyncExitStack()
         leer, escribir = await self._pila.enter_async_context(stdio_client(params))
         self._sesion = await self._pila.enter_async_context(ClientSession(leer, escribir))
         await self._sesion.initialize()
+        log.info("servidor MCP (stdio) iniciado en %.1f s", time.perf_counter() - t0)
 
     async def _llamar(self, nombre: str, args: dict) -> dict:
         r = await asyncio.wait_for(self._sesion.call_tool(nombre, args), timeout=30)
@@ -56,6 +61,7 @@ class _PuenteStdio:
         try:
             return asyncio.run_coroutine_threadsafe(self._llamar(nombre, args), self.loop).result(timeout=40)
         except (asyncio.TimeoutError, TimeoutError):
+            log.warning("MCP: la tool %s no respondió a tiempo", nombre)
             return {"ok": False, "error": {"codigo": "MCP_TIMEOUT", "mensaje": "La tool no respondió a tiempo",
                                            "reintentable": True}}
 
@@ -88,20 +94,26 @@ class ClienteHerramientas:
             return {"ok": False, "error": {"codigo": "TOOL_DESCONOCIDA", "mensaje": nombre}}
         if "trace_id" in inspect.signature(tools.REGISTRO[nombre]).parameters:
             args.setdefault("trace_id", trace_id_actual() or "")
+        visibles = {k: v for k, v in args.items() if k != "trace_id"}
+        log.debug("tool %s(%s) [%s]", nombre, str(sanitizar(visibles))[:300], self.transporte)
         with trazar(f"tool.{nombre}", **{"tool.name": nombre, "tool.transporte": self.transporte,
-                                         "tool.args": {k: v for k, v in args.items() if k != "trace_id"}}) as sp:
+                                         "tool.args": visibles}) as sp:
             t0 = time.perf_counter()
             res = self._ejecutar(nombre, args)
             if not res.get("ok") and res.get("error", {}).get("reintentable"):
+                log.warning("tool %s falló (%s); se reintenta una vez", nombre, res["error"]["codigo"])
                 sp.add_event("reintento", {"motivo": res["error"]["codigo"]})
                 time.sleep(0.3)
                 res = self._ejecutar(nombre, args)
             sp.set_attribute("tool.ok", bool(res.get("ok")))
             sp.set_attribute("tool.latencia_ms", round((time.perf_counter() - t0) * 1000, 2))
+            ms = (time.perf_counter() - t0) * 1000
             if res.get("ok"):
                 poner_atributo(sp, "tool.resultado", res["data"])
+                log.debug("tool %s OK en %.0f ms -> %s", nombre, ms, str(sanitizar(res["data"]))[:300])
             else:
                 err = res.get("error", {})
+                log.warning("tool %s ERROR %s en %.0f ms: %s", nombre, err.get("codigo"), ms, str(err.get("mensaje"))[:200])
                 sp.set_attribute("tool.error.codigo", err.get("codigo", "?"))
                 poner_atributo(sp, "tool.error.mensaje", err.get("mensaje"))
                 if err.get("codigo") in ERRORES_TECNICOS:

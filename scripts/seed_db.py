@@ -6,6 +6,7 @@ Reemplaza los datos de negocio y de proceso (no toca el catálogo de servicios n
 from __future__ import annotations
 
 import argparse
+import logging
 import sys
 from pathlib import Path
 
@@ -16,10 +17,12 @@ from reclamos import db  # noqa: E402
 from reclamos.config import get_settings  # noqa: E402
 from reclamos.escenario import CATALOGO_SERVICIOS, Escenario, construir_escenario  # noqa: E402
 
+log = logging.getLogger("reclamos.seed")
+
 # Orden hijo -> padre para limpiar sin violar FKs
 TABLAS_NEGOCIO = [
-    "EmailOutbox", "Discrepancia", "Evidencia", "Reembolso", "AprobacionHitl", "TicketEvento",
-    "IdempotencyKey", "Ticket", "OtpChallenge", "LoginTrack", "Transaccion", "Tarjeta", "Balance",
+    "Discrepancia", "Evidencia", "Reembolso", "AprobacionHitl", "TicketEvento",
+    "IdempotencyKey", "Ticket", "Sesion", "Transaccion", "Tarjeta", "Balance",
     "Cuenta", "Cliente", "ParametroEscenario",
 ]
 
@@ -27,9 +30,13 @@ TABLAS_NEGOCIO = [
 def limpiar(cn) -> None:
     for t in TABLAS_NEGOCIO:
         cn.cursor().execute(f"DELETE FROM {t}")
+    log.debug("BD: %d tablas de negocio vaciadas", len(TABLAS_NEGOCIO))
 
 
 def cargar(esc: Escenario) -> None:
+    log.info("BD: cargando el escenario %s/%s tipo=%s (%d clientes, %d cuentas, %d tarjetas, %d transacciones)",
+             esc.caso_id, esc.semilla, esc.tipo, len(esc.clientes), len(esc.cuentas), len(esc.tarjetas),
+             len(esc.transacciones))
     with db.conexion() as cn:
         limpiar(cn)
         c = cn.cursor()
@@ -73,6 +80,7 @@ def cargar(esc: Escenario) -> None:
         }
         for k, v in params.items():
             c.execute("INSERT INTO ParametroEscenario (clave, valor) VALUES (?, ?)", (k, v))
+    log.info("BD: escenario cargado (umbral HITL=%s, accion esperada=%s)", esc.umbral_hitl, esc.accion_esperada)
 
 
 def resumen(esc: Escenario) -> str:
@@ -84,6 +92,8 @@ def resumen(esc: Escenario) -> str:
 
 
 if __name__ == "__main__":
+    from reclamos.observabilidad.otel import iniciar_registro
+    iniciar_registro("seed_db")
     s = get_settings()
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--caso-id", default=s.caso_id)

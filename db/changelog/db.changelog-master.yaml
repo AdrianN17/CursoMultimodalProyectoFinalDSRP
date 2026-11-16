@@ -4,7 +4,7 @@ databaseChangeLog:
   - include: {file: changes/003-ticket-idempotencia-historial.yaml, relativeToChangelogFile: true}
   - include: {file: changes/004-evidencia-discrepancia.yaml, relativeToChangelogFile: true}
   - include: {file: changes/005-hitl-reembolso.yaml, relativeToChangelogFile: true}
-  - include: {file: changes/006-otp-login-outbox.yaml, relativeToChangelogFile: true}
+  - include: {file: changes/006-sesion.yaml, relativeToChangelogFile: true}
   - include: {file: changes/007-catalogo-servicio.yaml, relativeToChangelogFile: true}
   - include: {file: changes/008-parametro-escenario.yaml, relativeToChangelogFile: true}
   - include: {file: changes/009-transaccion-autenticacion-otp.yaml, relativeToChangelogFile: true}

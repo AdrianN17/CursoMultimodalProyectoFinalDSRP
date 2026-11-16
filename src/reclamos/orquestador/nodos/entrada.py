@@ -1,4 +1,4 @@
-"""Nodos de PERCEPCIÓN: validación de entrada, STT, intención, identidad (OTP) y visión."""
+"""Nodos de PERCEPCIÓN: validación de entrada, STT, intención y visión."""
 from __future__ import annotations
 
 import hashlib
@@ -6,7 +6,6 @@ import logging
 from pathlib import Path
 
 from ...modalidades.validacion_archivos import ArchivoInvalido, validar_audio, validar_imagen
-from ...seguridad.otp import verificar_otp
 from ...validadores.constancia import validar_constancia
 from ..base import nodo
 
@@ -72,12 +71,6 @@ class EntradaMixin:
         if i.intento_manipulacion:
             log.warning("posible intento de manipulación en el relato (se ignora; decide el motor de reglas)")
         return {"intencion": i.model_dump()}
-
-    @nodo("verificar_otp")
-    def verificar_otp(self, s):
-        ok, motivo = verificar_otp(s["sesion_id"], s["cliente_id"], s.get("otp_codigo"))
-        log.info("verificación de identidad: %s", motivo)
-        return {} if ok else {"error_usuario": {"codigo": motivo, "mensaje": "Identidad no verificada"}}
 
     @nodo("vision_constancia")
     def vision_constancia(self, s):

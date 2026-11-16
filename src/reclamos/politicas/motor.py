@@ -13,7 +13,6 @@ INTENCIONES_RECLAMABLES = {"DUPLICADO", "SIN_CONSENTIMIENTO"}
 
 @dataclass
 class ContextoPolitica:
-    otp_verificado: bool
     evidencia_valida: bool
     moneda: str | None
     monto_constancia: float | None
@@ -47,8 +46,6 @@ def evaluar(c: ContextoPolitica) -> Decision:
     def d(accion: str, pol: list[str], motivo: str, **kw: Any) -> Decision:
         return Decision(accion=accion, politicas=pol, motivo=motivo, alertas=alertas, **kw)
 
-    if not c.otp_verificado:
-        return d("RECHAZAR", ["P-07"], "IDENTIDAD_NO_VERIFICADA")
     if c.moneda is not None and c.moneda != "PEN":
         return d("NO_DISPONIBLE_MONEDA", ["P-09"], "SOLO_SOLES: operación en moneda distinta de PEN")
     if not c.evidencia_valida:

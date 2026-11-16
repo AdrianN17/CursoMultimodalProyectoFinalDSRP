@@ -6,7 +6,9 @@ tablas conocidas, de modo que ninguna consulta depende del esquema por defecto d
 """
 from __future__ import annotations
 
+import logging
 import re
+import time
 from contextlib import contextmanager
 from typing import Any, Iterator
 
@@ -14,10 +16,12 @@ import pyodbc
 
 from .config import get_settings
 
+log = logging.getLogger("reclamos.db")
+
 TABLAS = (
     "Cliente", "Cuenta", "Balance", "Tarjeta", "Servicio", "Transaccion", "Ticket", "IdempotencyKey",
-    "TicketEvento", "Evidencia", "Discrepancia", "AprobacionHitl", "Reembolso", "OtpChallenge", "LoginTrack",
-    "EmailOutbox", "ParametroEscenario", "checkpoints", "checkpoint_blobs", "checkpoint_writes", "__CAMBIOS_LOCALES",
+    "TicketEvento", "Evidencia", "Discrepancia", "AprobacionHitl", "Reembolso", "Sesion",
+    "ParametroEscenario", "checkpoints", "checkpoint_blobs", "checkpoint_writes", "__CAMBIOS_LOCALES",
 )
 _NOMBRES = "|".join(sorted(TABLAS, key=len, reverse=True))
 # Solo se califica el nombre de tabla conocido que sigue a FROM/JOIN/INTO/UPDATE/TABLE. No analiza literales:
@@ -39,7 +43,15 @@ class _Cursor:
         self._cur, self._esquema = cur, esquema
 
     def execute(self, sql: str, *params: Any) -> "_Cursor":
-        self._cur.execute(calificar(sql, self._esquema), *params)
+        t0 = time.perf_counter()
+        try:
+            self._cur.execute(calificar(sql, self._esquema), *params)
+        except Exception as exc:  # el llamador decide si es grave (p. ej. clave duplicada tolerada por el checkpointer)
+            log.debug("SQL falló (%s) en %.0f ms | %s", type(exc).__name__, (time.perf_counter() - t0) * 1000,
+                      " ".join(sql.split())[:110])
+            raise
+        if "checkpoint" not in sql[:80].lower():  # el checkpointer ya resume cada put/get con su propio log
+            log.debug("SQL %.0f ms | %s", (time.perf_counter() - t0) * 1000, " ".join(sql.split())[:110])
         return self
 
     def __getattr__(self, nombre: str) -> Any:
@@ -62,15 +74,25 @@ class _Conexion:
 @contextmanager
 def conexion(autocommit: bool = False) -> Iterator[_Conexion]:
     s = get_settings()
-    cn = pyodbc.connect(s.sql_conn_str(), autocommit=autocommit)
+    t0 = time.perf_counter()
+    try:
+        cn = pyodbc.connect(s.sql_conn_str(), autocommit=autocommit)
+    except Exception as exc:
+        log.warning("no se pudo conectar a SQL (%s/%s) tras %.1f s: %s", s.sql_server, s.sql_database,
+                    time.perf_counter() - t0, type(exc).__name__)
+        raise
+    log.debug("conexión SQL abierta en %.0f ms (esquema=%s, autocommit=%s)", (time.perf_counter() - t0) * 1000,
+              s.sql_schema or "(por defecto)", autocommit)
     cn.timeout = 20
     try:
         yield _Conexion(cn, s.sql_schema)
         if not autocommit:
             cn.commit()
-    except Exception:
+            log.debug("transacción SQL confirmada")
+    except Exception as exc:
         if not autocommit:
             cn.rollback()
+            log.debug("transacción SQL revertida (%s)", type(exc).__name__)
         raise
     finally:
         cn.close()

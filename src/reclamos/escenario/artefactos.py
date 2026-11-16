@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import json
+import logging
 import random
 import struct
 import wave
@@ -11,6 +12,8 @@ from PIL import Image, ImageDraw, ImageFont
 from PIL.PngImagePlugin import PngInfo
 
 from .escenario import Escenario
+
+log = logging.getLogger("reclamos.escenario")
 
 
 def _fuente(tam: int):
@@ -85,7 +88,10 @@ def generar_audio_relato(relato: str, destino_sin_ext: Path, proveedor) -> Path:
 
 def generar_artefactos(esc: Escenario, carpeta: Path, proveedor) -> dict[str, Path | None]:
     carpeta.mkdir(parents=True, exist_ok=True)
-    return {
+    rutas = {
         "audio": generar_audio_relato(esc.relato, carpeta / "reporte", proveedor),
         "imagen": generar_constancia_png(esc.constancia, carpeta / "constancia.png") if esc.constancia else None,
     }
+    log.debug("artefactos del escenario %s/%s: audio=%s (%d bytes), imagen=%s", esc.caso_id, esc.semilla,
+              rutas["audio"].name, rutas["audio"].stat().st_size, rutas["imagen"].name if rutas["imagen"] else "no")
+    return rutas

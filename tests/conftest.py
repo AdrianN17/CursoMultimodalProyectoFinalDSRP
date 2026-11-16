@@ -25,7 +25,6 @@ os.environ["QDRANT_PATH"] = str(RAIZ / ".qdrant_test")
 os.environ["OTEL_EXPORTER_OTLP_ENDPOINT"] = ""
 # Aislar de los valores reales de .env (load_dotenv no pisa variables ya definidas).
 os.environ["ANALISTA_API_KEY"] = "demo-analista"
-os.environ["SMTP_HOST"] = ""
 os.environ["CASO_ID"] = "C-07"
 os.environ["SEMILLA"] = "4213"
 

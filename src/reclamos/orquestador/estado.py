@@ -17,7 +17,6 @@ class ReclamoState(TypedDict, total=False):
     texto: str | None
     audio_path: str | None
     imagen_path: str | None
-    otp_codigo: str | None
     # --- percepción -----------------------------------------------------------------------------
     transcripcion: str
     origen_relato: str

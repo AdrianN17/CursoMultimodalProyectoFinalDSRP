@@ -1,5 +1,5 @@
 # Servicios de apoyo. La base de datos (Azure SQL) y Qdrant (Qdrant Cloud) son externos y se configuran en .env.
-#   docker compose up -d otel-collector jaeger mailhog             -> infraestructura
+#   docker compose up -d otel-collector jaeger                     -> infraestructura
 #   docker compose --profile migrar run --rm liquibase             -> aplica db/changelog sobre Azure SQL
 #   docker compose --profile app up --build                        -> API + UI en http://localhost:8000
 services:
@@ -14,10 +14,6 @@ services:
     volumes: ["./infra/otel-collector.yaml:/etc/otel/config.yaml:ro"]
     ports: ["4317:4317"]
     depends_on: [jaeger]
-
-  mailhog:
-    image: mailhog/mailhog:v1.0.1
-    ports: ["1025:1025", "8025:8025"]
 
   liquibase:
     profiles: ["migrar"]
@@ -36,7 +32,6 @@ services:
     env_file: .env
     environment:
       OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4317
-      SMTP_HOST: mailhog
     ports: ["8000:8000"]
     volumes: ["./evidencia:/app/evidencia", "./datos:/app/datos"]
-    depends_on: [otel-collector, mailhog]
+    depends_on: [otel-collector]

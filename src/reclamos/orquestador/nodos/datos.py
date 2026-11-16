@@ -93,7 +93,6 @@ class DatosMixin:
         if "USD" in (moneda, intencion.get("moneda_mencionada")):
             moneda = "USD"
         ctx = ContextoPolitica(
-            otp_verificado=True,
             evidencia_valida=bool(cons and cons.get("valida")),
             moneda=moneda or intencion.get("moneda_mencionada"),
             monto_constancia=cons.get("monto") if cons else None,

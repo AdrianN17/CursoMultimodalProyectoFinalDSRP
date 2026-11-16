@@ -21,11 +21,7 @@ def r_stt(s: State) -> str:
 
 
 def r_clasificar(s: State) -> str:
-    return "responder_error" if _falla(s) else "verificar_otp"
-
-
-def r_entrada(s: State) -> str:
-    """Router de entrada: ¿consulta de estado (memoria) o reclamo nuevo? ¿hay imagen que analizar?"""
+    """Tras clasificar la intención: ¿consulta de estado (memoria) o reclamo nuevo? ¿hay imagen que analizar?"""
     if _falla(s):
         return "responder_error"
     if (s.get("intencion") or {}).get("intencion") == "CONSULTA_ESTADO":

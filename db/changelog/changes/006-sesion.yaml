@@ -1,0 +1,21 @@
+databaseChangeLog:
+  - changeSet:
+      id: 006-sesion
+      author: reclamos
+      comment: Sesión de conversación del cliente (thread del checkpointer)
+      changes:
+        - createTable:
+            tableName: Sesion
+            columns:
+              - column: {name: sesion_id, type: "VARCHAR(60)", constraints: {primaryKey: true, primaryKeyName: PK_Sesion, nullable: false}}
+              - column: {name: cliente_id, type: "VARCHAR(20)", constraints: {nullable: false}}
+              - column: {name: canal,      type: "VARCHAR(12)", constraints: {nullable: false}}
+              - column: {name: creado_en,  type: DATETIME2, defaultValueComputed: SYSUTCDATETIME(), defaultValueConstraintName: DF_Sesion_creado, constraints: {nullable: false}}
+        - addForeignKeyConstraint:
+            constraintName: FK_Sesion_Cliente
+            baseTableName: Sesion
+            baseColumnNames: cliente_id
+            referencedTableName: Cliente
+            referencedColumnNames: cliente_id
+      rollback:
+        - dropTable: {tableName: Sesion}

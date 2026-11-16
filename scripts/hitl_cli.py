@@ -18,6 +18,8 @@ sys.path.insert(0, str(RAIZ / "src"))
 from reclamos.hitl import aprobacion as hitl  # noqa: E402
 
 if __name__ == "__main__":
+    from reclamos.observabilidad.otel import iniciar_registro
+    iniciar_registro("hitl_cli")  # si lo lanza otro proceso, añade al mismo fichero de temporal/
     ap = argparse.ArgumentParser(description=__doc__)
     sub = ap.add_subparsers(dest="cmd", required=True)
     sub.add_parser("listar")

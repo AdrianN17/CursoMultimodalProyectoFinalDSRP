@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import functools
 import json
+import logging
 import time
 from collections.abc import Iterator, Sequence
 from typing import Any
@@ -50,6 +51,9 @@ DDL = [
 ]
 
 
+log = logging.getLogger("reclamos.memoria")
+
+
 def _reintentar_deadlock(fn):
     """Reintenta ante deadlock (1205): LangGraph escribe desde hilos concurrentes sobre el mismo thread."""
     @functools.wraps(fn)
@@ -60,6 +64,7 @@ def _reintentar_deadlock(fn):
             except pyodbc.Error as e:
                 if "1205" not in str(e) or intento == 4:
                     raise
+                log.warning("checkpointer: deadlock (1205), reintento %d de 4", intento + 1)
                 time.sleep(0.05 * (intento + 1))
     return envoltura
 
@@ -80,6 +85,7 @@ class SqlServerSaver(BaseCheckpointSaver[str]):
         with db.conexion(autocommit=True) as cn:
             for ddl in DDL:
                 cn.cursor().execute(ddl)
+        log.info("checkpointer: tablas de memoria verificadas")
 
     # ---- lectura ---------------------------------------------------------------------------
     def _cargar(self, cn: Any, fila: dict, thread_id: str, ns: str, config: RunnableConfig | None) -> CheckpointTuple:
@@ -120,6 +126,7 @@ class SqlServerSaver(BaseCheckpointSaver[str]):
             else:
                 fila = db.uno("SELECT TOP 1 * FROM checkpoints WHERE thread_id = ? AND checkpoint_ns = ? "
                               "ORDER BY checkpoint_id DESC", (thread_id, ns), cn)
+            log.debug("checkpoint leído: hilo=%s -> %s", thread_id, fila["checkpoint_id"] if fila else "sin estado previo")
             return self._cargar(cn, fila, thread_id, ns, config) if fila else None
 
     def list(self, config: RunnableConfig | None, *, filter: dict[str, Any] | None = None,
@@ -178,6 +185,7 @@ class SqlServerSaver(BaseCheckpointSaver[str]):
                         (thread_id, ns, checkpoint["id"], padre, tipo_ck, blob_ck, meta), cn)
                 except pyodbc.IntegrityError:
                     db.ejecutar(upd, p_upd, cn)
+        log.debug("checkpoint guardado: hilo=%s id=%s canales_nuevos=%d", thread_id, checkpoint["id"], len(new_versions))
         return {"configurable": {"thread_id": thread_id, "checkpoint_ns": ns, "checkpoint_id": checkpoint["id"]}}
 
     @_reintentar_deadlock

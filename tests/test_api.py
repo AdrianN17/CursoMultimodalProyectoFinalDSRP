@@ -17,7 +17,7 @@ def cliente(servicio):
 
 def _subir(cliente, ses, rutas, esc, **extra):
     with open(rutas["audio"], "rb") as a, open(rutas["imagen"], "rb") as i:
-        return cliente.post("/api/v1/reclamos", data={"sesion_id": ses["sesion_id"], "otp": ses["otp_demo"],
+        return cliente.post("/api/v1/reclamos", data={"sesion_id": ses["sesion_id"],
                                                       "texto": esc.relato, **extra},
                             files={"audio": ("relato.wav", a, "audio/wav"), "imagen": ("c.png", i, "image/png")},
                             headers={"Idempotency-Key": "api-test-1"})

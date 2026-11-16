@@ -4,23 +4,27 @@ Resultados de la última ejecución (proveedor IA = *mock*; SQL **simulado con S
 
 | Comando | Resultado | Evidencia |
 |---|---|---|
-| `python -m pytest tests -v` | **79 passed, 1 skipped en 13.8 s** (el *skipped* es `test_hitl_se_reanuda_desde_otro_proceso`, marcado `integracion`) | `evidencia/pruebas/resultado_pytest.txt` |
-| `RUN_INTEGRACION=1 python -m pytest tests/test_persistencia_herramientas.py::test_hitl_se_reanuda_desde_otro_proceso -v` | **1 passed en 115.9 s** contra Azure SQL real (esquema `multimodal`; reanuda el HITL desde otro proceso) | ejecución local |
-| `python scripts/smoke_test.py` (mock + Azure SQL real) | **RESULTADO: OK** (7 escenarios + ciclo HITL) | `evidencia/pruebas/resultado_smoke_test.txt` |
+| `python -m pytest tests -v` | **87 passed, 1 skipped en 14.3 s** (el *skipped* es `test_hitl_se_reanuda_desde_otro_proceso`, marcado `integracion`) | `evidencia/pruebas/resultado_pytest.txt` |
+| `RUN_INTEGRACION=1 python -m pytest tests/test_persistencia_herramientas.py::test_hitl_se_reanuda_desde_otro_proceso -v` | **1 passed en 105.9 s** contra Azure SQL real (esquema `multimodal`; reanuda el HITL desde otro proceso) | ejecución local |
+| `PROVEEDOR_IA=azure python scripts/smoke_test.py` (gpt-5-mini, MAI-Transcribe-1.5, MAI-Voice-2, Azure SQL y Qdrant Cloud reales) | **RESULTADO: OK** (7 escenarios + ciclo HITL, ≈ 12 min por la latencia de Azure SQL) | `evidencia/pruebas/resultado_smoke_test.txt` |
 | Flujo con Azure OpenAI real (chat, visión y embeddings; STT/TTS simulados): `DUPLICADA` + HITL, `MONTO_DISCREPANTE`, `AJENA` | Las 3 decisiones esperadas; 65 s de latencia p50, ≈ USD 0.008 por reclamo | `evidencia/pruebas/resultado_azure_parcial.txt`, `evidencia/resumen_metricas_azure.md` |
 | `python main.py … --aprobar APROBADA` | `REEMBOLSO_PROGRAMADO`, `accion_final=REEMBOLSO` | `evidencia/pruebas/demo_duplicada_aprobada.txt` |
 | `python main.py … --aprobar RECHAZADA` | `HITL_RECHAZADO`, `accion_final=NINGUNA` (propuesta: `REEMBOLSO`) | `evidencia/pruebas/demo_duplicada_rechazada.txt` |
 
-> **Alcance honesto:** el proveedor *mock* valida el flujo, las políticas, las tools, el HITL y la persistencia, **no** la calidad de Whisper, la visión ni el TTS reales. El SQL simulado (SQLite) **no** valida T-SQL real, `CHECK` ni claves foráneas: eso lo cubre `RUN_INTEGRACION=1` y el script de paridad del esquema.
-> La ejecución con Azure OpenAI es **parcial**: `whisper` y `tts` devuelven `DeploymentNotFound`. Cuando existan, repita `main.py` y `smoke_test.py` con `PROVEEDOR_IA=azure` y guarde esa salida junto a la anterior. Para el *smoke test* con el proveedor *mock*, el código usa siempre Qdrant local (`QDRANT_PATH`) aunque `.env` tenga `QDRANT_URL`: la colección de Qdrant Cloud tiene vectores de 1536 dimensiones y el *mock* genera 256.
+> **Alcance honesto:** el proveedor *mock* valida el flujo, las políticas, las tools, el HITL y la persistencia, **no** la calidad de la voz, la visión ni el TTS reales. El SQL simulado (SQLite) **no** valida T-SQL real, `CHECK` ni claves foráneas: eso lo cubre `RUN_INTEGRACION=1` y el script de paridad del esquema.
+> La voz real (STT MAI-Transcribe-1.5 y TTS MAI-Voice-2) se verificó extremo a extremo con `PROVEEDOR_IA=azure`: el *smoke test* completo (`evidencia/pruebas/resultado_smoke_test.txt`) y un flujo con la fidelidad del STT (`evidencia/pruebas/resultado_azure_voz.txt`); las pruebas unitarias del proveedor usan `httpx` simulado. Para el *smoke test* con el proveedor *mock*, el código usa siempre Qdrant local (`QDRANT_PATH`) aunque `.env` tenga `QDRANT_URL`: la colección de Qdrant Cloud tiene vectores de 1536 dimensiones y el *mock* genera 256.
+>
+> **Hallazgo del log paso a paso:** en una corrida con Azure real el *smoke test* falló en el ciclo HITL porque la visión de `gpt-5-mini` devolvió `confianza=0.0` (copiaba el valor de ejemplo del prompt) y el validador marcó `CONFIANZA_DE_EXTRACCION_BAJA` (→ `PEDIR_INFO`, sin aprobación). Se corrigió el prompt (`vision_constancia_v1`, v1.0.1: la confianza es un número calculado por el modelo) y el validador ahora tolera una confianza no numérica; la repetición pasó con confianzas reales de 0.75 a 0.95.
+
+> Cada ejecución (también las pruebas y el smoke test) deja su log paso a paso en `temporal/<proceso>_<fecha-hora>.log`; el script imprime la ruta. Sirve para ver exactamente qué se ejecutó y dónde falló (ver README, «Registro paso a paso»).
 
 ## Cobertura por archivo
 
 | Archivo | Qué prueba |
 |---|---|
-| `tests/test_unidad.py` | Determinismo de la semilla; calificación de tablas con el esquema `multimodal`; validador de constancia; motor de políticas (reglas P-xx incl. P-11 operación con/sin OTP, umbral de supervisor, discrepancia, manipulación) |
-| `tests/test_flujos.py` | 8 escenarios (uno por tipo, incl. `SIN_CONSENTIMIENTO_CON_OTP`), HITL aprobar/rechazar/expirar, idempotencia, memoria de estado, OTP, adversariales y contradicción |
-| `tests/test_persistencia_herramientas.py` | Checkpoint legible por otra instancia; reanudación del HITL **desde otro proceso**; idempotencia de `crear_ticket`; privacidad de operaciones ajenas; `autenticada_otp` expuesto por la tool y escalada P-11; una sola acción por ticket; PII |
+| `tests/test_unidad.py` | Log por ejecución en `temporal/` (un fichero con fecha, DEBUG solo al fichero); voz Azure (MAI-Transcribe / MAI-Voice) con `httpx` simulado; determinismo de la semilla; calificación de tablas con el esquema `multimodal`; validador de constancia; motor de políticas (reglas P-xx incl. P-11 operación con/sin OTP, umbral de supervisor, discrepancia, manipulación) |
+| `tests/test_flujos.py` | 8 escenarios (uno por tipo, incl. `SIN_CONSENTIMIENTO_CON_OTP`), HITL aprobar/rechazar/expirar, idempotencia, memoria de estado, sesión inexistente, adversariales y contradicción |
+| `tests/test_persistencia_herramientas.py` | Checkpoint legible por otra instancia; reanudación del HITL **desde otro proceso**; idempotencia de `crear_ticket`; privacidad de operaciones ajenas; `autenticada_otp` expuesto por la tool y escalada P-11; escalamiento idempotente sin correo; una sola acción por ticket; PII |
 | `tests/test_api.py` | OpenAPI, subida multipart, clave de analista, `problem+json`, formatos no admitidos, path traversal del audio |
 
 ## Prueba de contradicción (obligatoria)

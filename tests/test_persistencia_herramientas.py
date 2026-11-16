@@ -18,8 +18,7 @@ RAIZ = Path(__file__).resolve().parents[1]
 
 
 def _enviar(srv, ses, rutas, **kw):
-    return srv.procesar(ses["sesion_id"], audio_path=rutas["audio"], imagen_path=rutas["imagen"],
-                        otp=ses["otp_demo"], **kw)
+    return srv.procesar(ses["sesion_id"], audio_path=rutas["audio"], imagen_path=rutas["imagen"], **kw)
 
 
 def test_checkpoint_persiste_en_sql_y_lo_lee_otra_instancia(servicio, escenario):
@@ -78,12 +77,21 @@ def test_tool_expone_si_la_operacion_se_autentico_con_otp(servicio, escenario, t
 
 def test_operacion_con_otp_desconocida_escala_y_no_propone_accion_monetaria(servicio, escenario):
     esc, ses, rutas = escenario("SIN_CONSENTIMIENTO_CON_OTP")
-    res = servicio.procesar(ses["sesion_id"], audio_path=rutas["audio"], imagen_path=rutas["imagen"],
-                            otp=ses["otp_demo"])
+    res = servicio.procesar(ses["sesion_id"], audio_path=rutas["audio"], imagen_path=rutas["imagen"])
     assert not res["pendiente_hitl"] and res["respuesta"]["tipo_respuesta"] == "ESCALADO_OTP"
-    assert db.uno("SELECT accion_ejecutada FROM Ticket WHERE ticket_id = ?",
-                  (res["ticket_id"],))["accion_ejecutada"] is None
-    assert db.uno("SELECT COUNT(*) AS n FROM EmailOutbox WHERE ticket_id = ?", (res["ticket_id"],))["n"] == 1
+    t = db.uno("SELECT accion_ejecutada, estado FROM Ticket WHERE ticket_id = ?", (res["ticket_id"],))
+    assert t["accion_ejecutada"] is None and t["estado"] == "EN_ESCALAMIENTO"
+    assert db.uno("SELECT COUNT(*) AS n FROM TicketEvento WHERE ticket_id = ? AND tipo = 'ESCALADO_A_OPERADOR'",
+                  (res["ticket_id"],))["n"] == 1
+
+
+def test_escalar_operador_es_idempotente(servicio, escenario):
+    esc, ses, rutas = escenario("MONTO_DISCREPANTE")
+    res = _enviar(servicio, ses, rutas)
+    otra = servicio.tools.llamar("escalar_operador", ticket_id=res["ticket_id"], motivo="reintento", resumen="x")
+    assert otra["ok"] and otra["data"]["repetido"] is True
+    assert db.uno("SELECT COUNT(*) AS n FROM TicketEvento WHERE ticket_id = ? AND tipo = 'ESCALADO_A_OPERADOR'",
+                  (res["ticket_id"],))["n"] == 1
 
 
 def test_solo_una_accion_por_ticket_aun_con_aprobacion(servicio, escenario):

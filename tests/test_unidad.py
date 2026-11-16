@@ -58,7 +58,7 @@ def test_forzar_tipo_no_desplaza_el_resto_de_elementos():
     for tipo in TIPOS_CASO:
         forzado = construir_escenario("C-07", 4213, tipo)
         assert forzado.tipo == tipo
-        assert forzado.cliente_id == base.cliente_id and forzado.otp == base.otp
+        assert forzado.cliente_id == base.cliente_id and forzado.umbral_hitl == base.umbral_hitl
 
 
 def _extraido(c: dict) -> dict:
@@ -99,6 +99,16 @@ def test_constancia_acepta_tarjeta_de_4_o_5_digitos_finales():
     assert r.valida and r.ultimos4 == ult4
 
 
+@pytest.mark.parametrize("confianza,valida", [(0.9, True), ("0.8", True), ("<número entre 0 y 1>", True),
+                                              (None, True), (0.0, False)])
+def test_confianza_no_numerica_no_rompe_el_validador(confianza, valida):
+    c = _base()
+    c["confianza"] = confianza
+    r = validar_constancia(c)
+    assert r.valida is valida
+    assert (r.confianza is None) == (confianza in (None, "<número entre 0 y 1>"))
+
+
 # ---------------------------------------------------------------- motor
 def _tx(**kw):
     base = dict(transaccion_id="T1", monto=250.0, pertenece_al_cliente=True, anulada=False, facturada=False,
@@ -107,7 +117,7 @@ def _tx(**kw):
 
 
 def _ctx(**kw):
-    base = dict(otp_verificado=True, evidencia_valida=True, moneda="PEN", monto_constancia=250.0,
+    base = dict(evidencia_valida=True, moneda="PEN", monto_constancia=250.0,
                 intencion="DUPLICADO", tx=_tx(), duplicados=[_tx(transaccion_id="T0", fecha_hora=datetime(2025, 1, 9)),
                                                               _tx()])
     return ContextoPolitica(**{**base, **kw})
@@ -128,7 +138,6 @@ def test_motor_reembolsa_si_ya_facturo_y_exige_supervisor_sobre_umbral():
 
 
 @pytest.mark.parametrize("kw,accion,politica", [
-    (dict(otp_verificado=False), "RECHAZAR", "P-07"),
     (dict(moneda="USD"), "NO_DISPONIBLE_MONEDA", "P-09"),
     (dict(evidencia_valida=False), "PEDIR_INFO", "P-02"),
     (dict(tx=_tx(pertenece_al_cliente=False)), "RECHAZAR", "P-04"),
@@ -157,3 +166,84 @@ def test_motor_registra_discrepancia_de_monto_con_dato_maestro_ganador():
 def test_manipulacion_solo_agrega_alerta_no_cambia_la_decision():
     assert evaluar(_ctx(intento_manipulacion=True)).accion == evaluar(_ctx()).accion
     assert "INTENTO_DE_MANIPULACION_DETECTADO" in evaluar(_ctx(intento_manipulacion=True)).alertas
+
+# ---------------------------------------------------------------- voz (Azure Speech, sin red)
+def _proveedor_azure():
+    from dataclasses import replace
+
+    from reclamos.config import get_settings
+    from reclamos.proveedores.azure_openai import ProveedorAzure
+    s = replace(get_settings(), azure_endpoint="https://x.openai.azure.com", azure_api_key="k",
+                speech_endpoint="https://x.cognitiveservices.azure.com", speech_key="clave-voz")
+    return ProveedorAzure(s)
+
+
+class _Resp:
+    def __init__(self, contenido=b"", json_=None):
+        self.status_code, self.content, self._json = 200, contenido, json_
+
+    def json(self):
+        return self._json
+
+    def raise_for_status(self):
+        pass
+
+
+def test_stt_usa_mai_transcribe_y_une_las_frases(monkeypatch, tmp_path):
+    llamadas = {}
+
+    def falso(metodo, url, **kw):
+        llamadas.update(url=url, kw=kw)
+        return _Resp(json_={"combinedPhrases": [{"text": "Hola, me cobraron dos veces."}]})
+
+    monkeypatch.setattr("httpx.request", falso)
+    wav = tmp_path / "a.wav"
+    wav.write_bytes(b"RIFF....")
+    assert _proveedor_azure()._transcribir(wav) == "Hola, me cobraron dos veces."
+    assert llamadas["url"].endswith("/speechtotext/transcriptions:transcribe?api-version=2025-10-15")
+    assert llamadas["kw"]["headers"]["Ocp-Apim-Subscription-Key"] == "clave-voz"
+    assert "mai-transcribe-1.5" in llamadas["kw"]["data"]["definition"]
+
+
+def test_tts_usa_mai_voice_y_escapa_el_ssml(monkeypatch, tmp_path):
+    llamadas = {}
+
+    def falso(metodo, url, **kw):
+        llamadas.update(url=url, kw=kw)
+        return _Resp(contenido=b"ID3audio")
+
+    monkeypatch.setattr("httpx.request", falso)
+    destino = tmp_path / "r.mp3"
+    _proveedor_azure()._sintetizar("Reembolso <S/ 100> & más", destino)
+    ssml = llamadas["kw"]["content"].decode()
+    assert "es-ES-Marta:MAI-Voice-2" in ssml and "&lt;S/ 100&gt; &amp; más" in ssml
+    assert llamadas["url"].endswith("/tts/cognitiveservices/v1")
+    assert destino.read_bytes() == b"ID3audio"
+
+# ---------------------------------------------------------------- registro paso a paso (temporal/)
+def test_cada_ejecucion_escribe_un_log_con_fecha_en_temporal(tmp_path):
+    import os
+    import subprocess
+    import sys
+    from pathlib import Path
+
+    raiz = Path(__file__).resolve().parents[1]
+    codigo = (
+        "import logging\n"
+        "from reclamos.observabilidad.otel import iniciar_registro, trazar\n"
+        "iniciar_registro('prueba')\n"
+        "logging.getLogger('reclamos.prueba').info('hola paso a paso')\n"
+        "with trazar('nodo.demo'):\n"
+        "    logging.getLogger('reclamos.prueba').debug('detalle interno')\n"
+    )
+    env = {k: v for k, v in os.environ.items() if k != "REGISTRO_ARCHIVO"}
+    env.update(PYTHONPATH=str(raiz / "src"), TEMPORAL_DIR=str(tmp_path / "temporal"),
+               EVIDENCIA_DIR=str(tmp_path / "evidencia"), PYTHONIOENCODING="utf-8")
+    p = subprocess.run([sys.executable, "-c", codigo], env=env, capture_output=True, text=True, timeout=60)
+    assert p.returncode == 0, p.stderr[-500:]
+    ficheros = list((tmp_path / "temporal").glob("prueba_????-??-??_??-??-??.log"))
+    assert len(ficheros) == 1, "debe crearse un fichero por ejecución con la fecha y hora en el nombre"
+    texto = ficheros[0].read_text(encoding="utf-8")
+    for esperado in ("hola paso a paso", "detalle interno", "-> nodo.demo", "<- nodo.demo", "registro iniciado"):
+        assert esperado in texto, esperado
+    assert "detalle interno" not in p.stderr, "el nivel DEBUG va solo al fichero, no a la consola"

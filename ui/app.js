@@ -14,18 +14,7 @@ async function llamar(url, opciones = {}) {
 // ---------------------------------------------------------------- cliente
 function iniciarCliente() {
   let sesionId = null, audioBlob = null, imagen = null, grabador = null, trozos = [];
-  const habilitar = () => { $("btn-enviar").disabled = !(sesionId && (audioBlob) && imagen && $("otp").value.length >= 4); };
-
-  $("btn-sesion").onclick = async () => {
-    try {
-      const s = await llamar(`${API}/sesiones`, { method: "POST", headers: { "Content-Type": "application/json" }, body: "{}" });
-      sesionId = s.sesion_id;
-      $("otp-info").textContent = s.otp_demo
-        ? `Sesión ${s.sesion_id}. Modo demo: su código es ${s.otp_demo}.`
-        : `Sesión ${s.sesion_id}. Le enviamos un código a su correo registrado.`;
-      aviso("Sesión iniciada", "ok"); habilitar();
-    } catch (e) { aviso(e.message, "error"); }
-  };
+  const habilitar = () => { $("btn-enviar").disabled = !(audioBlob && imagen); };
 
   $("btn-grabar").onclick = async () => {
     if (grabador && grabador.state === "recording") { grabador.stop(); return; }
@@ -53,15 +42,17 @@ function iniciarCliente() {
     if (imagen) { $("previa-imagen").src = URL.createObjectURL(imagen); $("previa-imagen").hidden = false; }
     habilitar();
   };
-  $("otp").oninput = habilitar;
-
   $("btn-enviar").onclick = async () => {
-    const fd = new FormData();
-    fd.append("sesion_id", sesionId); fd.append("otp", $("otp").value);
-    fd.append("audio", audioBlob); fd.append("imagen", imagen);
-    if ($("texto").value.trim()) fd.append("texto", $("texto").value.trim());
     $("btn-enviar").disabled = true; aviso("Procesando su reclamo…");
     try {
+      if (!sesionId) {
+        const s = await llamar(`${API}/sesiones`, { method: "POST", headers: { "Content-Type": "application/json" }, body: "{}" });
+        sesionId = s.sesion_id;
+      }
+      const fd = new FormData();
+      fd.append("sesion_id", sesionId);
+      fd.append("audio", audioBlob); fd.append("imagen", imagen);
+      if ($("texto").value.trim()) fd.append("texto", $("texto").value.trim());
       const r = await llamar(`${API}/reclamos`, { method: "POST", body: fd, headers: { "Idempotency-Key": crypto.randomUUID() } });
       depurar(r);
       if (r.audio_url) {

@@ -9,8 +9,7 @@ Elementos del escenario que la semilla modifica (cada uno cambia la decisión de
   4. Estado de la tarjeta (habilitada/deshabilitada) -> decide si pasa a operador (P-06).
   5. Umbral de monto para aprobación reforzada (rol SUPERVISOR) en el HITL.
   6. Datos de la constancia de pago (fecha, hora, monto, código) usados para generar la imagen.
-  7. OTP simulado del cliente.
-  8. Si la operación reclamada se autenticó con OTP o no (indicio de fraude, política P-11).
+  7. Si la operación reclamada se autenticó con OTP o no (indicio de fraude, política P-11).
 
 `tipo` puede forzarse (pruebas/demo) pero todos los demás valores siguen dependiendo de la semilla.
 """
@@ -106,7 +105,6 @@ class Escenario:
     tipo: str
     fecha_referencia: date
     umbral_hitl: int
-    otp: str
     cliente_id: str
     otro_cliente_id: str
     clientes: list[ClienteSeed] = field(default_factory=list)
@@ -156,9 +154,9 @@ def construir_escenario(caso_id: str, semilla: int, tipo: str | None = None) -> 
     if tipo_final not in TIPOS_CASO:
         raise ValueError(f"tipo de caso desconocido: {tipo_final}")
 
-    # --- elemento 5 y 7: umbral HITL reforzado y OTP simulado ------------------------------
+    # --- elemento 5: umbral HITL reforzado ----------------------------------------------------
     umbral_hitl = rng.choice([500, 1000, 2000])
-    otp = f"{rng.randint(0, 999999):06d}"
+    rng.randint(0, 999999)  # sorteo heredado: se conserva para que la misma semilla siga generando los mismos datos
 
     # --- elemento 2: fecha de referencia, ciclo de facturación y fecha de la operación ------
     fecha_ref = date(2026, 10, 9) + timedelta(days=rng.randint(0, 12))
@@ -200,7 +198,7 @@ def construir_escenario(caso_id: str, semilla: int, tipo: str | None = None) -> 
 
     esc = Escenario(
         caso_id=caso_id, semilla=semilla, tipo=tipo_final, fecha_referencia=fecha_ref,
-        umbral_hitl=umbral_hitl, otp=otp, cliente_id=cliente_id, otro_cliente_id=otro_id,
+        umbral_hitl=umbral_hitl, cliente_id=cliente_id, otro_cliente_id=otro_id,
         facturada=facturada, monto_bd=monto,
     )
     esc.clientes = [crear_cliente(cliente_id), crear_cliente(otro_id)]
@@ -229,7 +227,7 @@ def construir_escenario(caso_id: str, semilla: int, tipo: str | None = None) -> 
     grupo = f"DUP-{rng.randint(100, 999)}" if tipo_final == "DUPLICADA" else None
     principal = TransaccionSeed(f"TX-{codigo}", codigo, duenio_tx.tarjeta_id, servicio.servicio_id, monto,
                                 hora_op, canal, grupo)
-    # --- elemento 8: autenticación OTP de la operación (indicio de fraude, P-11) -------------
+    # --- elemento 7: autenticación OTP de la operación (indicio de fraude, P-11) -------------
     # Quien desconoce una compra "sin OTP" tiene un reclamo fuerte; con OTP validado se escala a un operador.
     principal.autenticada_otp = tipo_final not in ("SIN_CONSENTIMIENTO", "TARJETA_DESHABILITADA")
     esc.transacciones.append(principal)

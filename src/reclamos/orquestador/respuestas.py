@@ -7,7 +7,7 @@ ESTADO_TXT = {
     "ABIERTO": "abierto y en espera de información",
     "EN_ANALISIS": "en análisis",
     "PENDIENTE_APROBACION": "en revisión por un analista",
-    "EN_ESCALAMIENTO": "derivado a un operador, que se comunicará con usted por correo",
+    "EN_ESCALAMIENTO": "derivado a un operador, que revisará su caso",
     "PENDIENTE_TECNICO": "pendiente por un inconveniente técnico",
     "CERRADO": "cerrado",
 }
@@ -24,11 +24,6 @@ ERRORES_USUARIO = {
     "ARCHIVO_MUY_GRANDE": "El archivo es demasiado grande. Envíe uno más liviano.",
     "AUDIO_ININTELIGIBLE": "No logramos escuchar con claridad su mensaje. ¿Puede repetirlo o escribirlo?",
     "SIN_ENTRADA": "No recibimos ningún mensaje. Cuéntenos por voz o texto qué ocurrió con su operación.",
-    "OTP_REQUERIDO": "Para continuar necesitamos el código de verificación que le enviamos.",
-    "OTP_INCORRECTO": "El código de verificación no es correcto. Inténtelo nuevamente.",
-    "OTP_BLOQUEADO": "Superó los intentos permitidos. Solicite un nuevo código de verificación.",
-    "OTP_EXPIRADO": "El código de verificación venció. Solicite uno nuevo.",
-    "SIN_OTP_EMITIDO": "No pudimos verificar su identidad. Inicie una nueva sesión.",
     "SIN_RECLAMO": "No encontramos un reclamo previo en esta conversación. Cuéntenos qué ocurrió con su operación.",
     "IDEMPOTENCY_CONFLICT": "Esa solicitud ya se usó con otros datos. Envíe su reclamo nuevamente.",
 }
@@ -62,17 +57,17 @@ def texto_para(tipo: str, d: dict[str, Any]) -> str:
                 f"{ref}")
     if tipo == "ESCALADO_DISCREPANCIA":
         return (f"Encontramos una diferencia entre su constancia y nuestros registros, por eso su caso será revisado "
-                f"por un operador, que se comunicará con usted por correo.{ref}")
+                f"por un operador.{ref}")
     if tipo == "ESCALADO_TARJETA":
         return (f"La tarjeta de la compra no está habilitada, por lo que un operador coordinará con usted el medio de "
-                f"reembolso por correo.{ref}")
+                f"reembolso.{ref}")
     if tipo == "ESCALADO_OTP":
         return (f"Esa operación fue confirmada con su código de verificación, por lo que su caso será revisado "
-                f"por un operador, que se comunicará con usted por correo.{ref}")
+                f"por un operador.{ref}")
     if tipo == "ESCALADO_HITL_EXPIRADO":
         return f"Su reclamo no pudo ser revisado a tiempo y fue derivado a un operador, que se comunicará con usted.{ref}"
     if tipo == "ESCALADO":
-        return f"Su caso requiere la revisión de un operador, que se comunicará con usted por correo.{ref}"
+        return f"Su caso requiere la revisión de un operador.{ref}"
     if tipo == "RECHAZO_AJENA":
         return f"No podemos atender esta solicitud porque la operación no corresponde a su cuenta.{ref}"
     if tipo == "RECHAZO_UNA_POR_RECLAMO":

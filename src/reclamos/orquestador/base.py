@@ -53,6 +53,7 @@ def nodo(nombre: str) -> Callable:
                                              "turno": state.get("turno")}) as sp:
                 try:
                     salida = fn(self, state) or {}
+                    log.debug("nodo %s terminó; actualiza: %s", nombre, ", ".join(sorted(k for k in salida)) or "(nada)")
                 except GraphInterrupt:
                     sp.set_attribute("hitl.interrumpido", True)
                     log.info("nodo %s: flujo interrumpido a la espera de aprobación humana", nombre)

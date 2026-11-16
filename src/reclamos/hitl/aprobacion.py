@@ -46,16 +46,22 @@ def resolver_aprobacion(aprobacion_id: str, decision: str, motivo: str, aprobado
                                     "hitl.rol": aprobador_rol}) as sp:
         ap = obtener(aprobacion_id)
         if not ap:
+            log.warning("HITL: no existe la aprobación %s", aprobacion_id)
             raise HitlError("NO_EXISTE", f"No existe la aprobación {aprobacion_id}")
+        log.debug("HITL %s: estado=%s rol_requerido=%s accion=%s monto=%s", aprobacion_id, ap["estado"],
+                  ap["rol_requerido"], ap["accion_propuesta"], ap["monto"])
         if ap["estado"] != "PENDIENTE":
             sp.set_attribute("hitl.resultado", "YA_RESUELTA")
+            log.warning("HITL %s: ya estaba %s; se ignora la decisión", aprobacion_id, ap["estado"])
             raise HitlError("YA_RESUELTA", f"La aprobación ya está {ap['estado']}")
         if ap["expira_en"] < _ahora():
             _marcar_expirada(ap)
             sp.set_attribute("hitl.resultado", "EXPIRADA")
+            log.warning("HITL %s: la solicitud venció; no se ejecuta la acción", aprobacion_id)
             raise HitlError("EXPIRADA", "La solicitud venció; por seguridad no se ejecuta la acción")
         if ap["rol_requerido"] == "SUPERVISOR" and aprobador_rol != "SUPERVISOR":
             sp.set_attribute("hitl.resultado", "ROL_INSUFICIENTE")
+            log.warning("HITL %s: rol %s insuficiente (se requiere SUPERVISOR)", aprobacion_id, aprobador_rol)
             raise HitlError("ROL_INSUFICIENTE", "Esta aprobación requiere rol SUPERVISOR (monto sobre el umbral)")
         n = db.ejecutar(
             "UPDATE AprobacionHitl SET estado = ?, aprobador = ?, motivo = ?, resuelta_en = SYSUTCDATETIME() "
@@ -84,6 +90,7 @@ def _marcar_expirada(ap: dict) -> None:
 def expirar_vencidas() -> list[dict]:
     """Barrido de timeout: toda aprobación vencida pasa a EXPIRADA (no se ejecuta nada). Devuelve las afectadas."""
     vencidas = db.consultar("SELECT * FROM AprobacionHitl WHERE estado = 'PENDIENTE' AND expira_en < ?", (_ahora(),))
+    log.info("HITL: barrido de expiración, %d aprobaciones vencidas", len(vencidas))
     for ap in vencidas:
         with trazar("hitl.expiracion", **{"hitl.aprobacion_id": ap["aprobacion_id"], "hitl.resultado": "EXPIRADA"}):
             _marcar_expirada(ap)

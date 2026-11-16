@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import atexit
+import logging
 import re
 from pathlib import Path
 from threading import Lock
@@ -12,6 +13,8 @@ from qdrant_client.models import Distance, PointStruct, VectorParams
 from ..config import RAIZ, get_settings
 from ..observabilidad.otel import trazar
 from ..proveedores.interfaces import ProveedorIA
+
+log = logging.getLogger("reclamos.rag")
 
 RUTA_POLITICAS = RAIZ / "rag" / "politicas_reclamacion.md"
 _CLIENTES: dict[str, QdrantClient] = {}
@@ -36,6 +39,7 @@ def obtener_cliente() -> QdrantClient:
     clave = url or s.qdrant_path
     with _LOCK:
         if clave not in _CLIENTES:
+            log.debug("Qdrant: creando cliente (%s)", "nube" if url else f"local {s.qdrant_path}")
             _CLIENTES[clave] = (QdrantClient(url=url, api_key=s.qdrant_api_key or None)
                                 if url else QdrantClient(path=s.qdrant_path))
         return _CLIENTES[clave]
@@ -64,6 +68,7 @@ def indexar(proveedor: ProveedorIA, forzar: bool = False) -> int:
             puntos, _ = cli.scroll(s.qdrant_coleccion, limit=1, with_payload=True)
             if puntos and puntos[0].payload.get("version") == version:
                 sp.set_attribute("rag.reindexado", False)
+                log.info("RAG: índice vigente (versión %s, %d políticas)", version, len(politicas))
                 return len(politicas)
         vectores = proveedor.embeber([p["texto"] for p in politicas])
         if cli.collection_exists(s.qdrant_coleccion):
@@ -73,4 +78,6 @@ def indexar(proveedor: ProveedorIA, forzar: bool = False) -> int:
         cli.upsert(s.qdrant_coleccion, points=[
             PointStruct(id=i, vector=v, payload=p) for i, (p, v) in enumerate(zip(politicas, vectores))])
         sp.set_attribute("rag.reindexado", True)
+        log.info("RAG: %d políticas indexadas (versión %s, vectores de %d dimensiones)", len(politicas), version,
+                 len(vectores[0]))
         return len(politicas)
