@@ -34,6 +34,7 @@ def test_checkpoint_persiste_en_sql_y_lo_lee_otra_instancia(servicio, escenario)
     assert db.uno("SELECT COUNT(*) AS n FROM checkpoints WHERE thread_id = ?", (ses["sesion_id"],))["n"] >= 2
 
 
+@pytest.mark.integracion
 def test_hitl_se_reanuda_desde_otro_proceso(servicio, escenario, tmp_path):
     """Simula 'el servidor se reinició mientras el humano pensaba': otro proceso aprueba y retoma el hilo."""
     esc, ses, rutas = escenario("DUPLICADA")
@@ -65,6 +66,24 @@ def test_transaccion_ajena_no_devuelve_detalle(servicio, escenario):
                               codigo_operacion=esc.tx_principal_codigo)
     assert r["ok"] and r["data"]["pertenece_al_cliente"] is False
     assert set(r["data"]) <= {"pertenece_al_cliente", "codigo_operacion"}, "no debe filtrar monto/fecha/empresa"
+
+
+@pytest.mark.parametrize("tipo,esperado", [("SIN_CONSENTIMIENTO", False), ("SIN_CONSENTIMIENTO_CON_OTP", True)])
+def test_tool_expone_si_la_operacion_se_autentico_con_otp(servicio, escenario, tipo, esperado):
+    esc, ses, _ = escenario(tipo)
+    r = servicio.tools.llamar("consultar_transaccion", cliente_id=ses["cliente_id"],
+                              codigo_operacion=esc.tx_principal_codigo)
+    assert r["ok"] and r["data"]["autenticada_otp"] is esperado
+
+
+def test_operacion_con_otp_desconocida_escala_y_no_propone_accion_monetaria(servicio, escenario):
+    esc, ses, rutas = escenario("SIN_CONSENTIMIENTO_CON_OTP")
+    res = servicio.procesar(ses["sesion_id"], audio_path=rutas["audio"], imagen_path=rutas["imagen"],
+                            otp=ses["otp_demo"])
+    assert not res["pendiente_hitl"] and res["respuesta"]["tipo_respuesta"] == "ESCALADO_OTP"
+    assert db.uno("SELECT accion_ejecutada FROM Ticket WHERE ticket_id = ?",
+                  (res["ticket_id"],))["accion_ejecutada"] is None
+    assert db.uno("SELECT COUNT(*) AS n FROM EmailOutbox WHERE ticket_id = ?", (res["ticket_id"],))["n"] == 1
 
 
 def test_solo_una_accion_por_ticket_aun_con_aprobacion(servicio, escenario):

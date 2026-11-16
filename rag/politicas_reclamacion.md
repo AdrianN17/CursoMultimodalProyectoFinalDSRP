@@ -1,4 +1,4 @@
-<!-- version: 1.0.0 -->
+<!-- version: 1.1.0 -->
 # Políticas de reclamación de consumos y operaciones con tarjeta
 
 Documento normativo (ficticio) que respalda las decisiones del agente. Cada política tiene un identificador
@@ -48,3 +48,10 @@ La constancia debe ser una "Constancia de Pago" con: fecha y hora, cuenta de car
 enmascarada), empresa, servicio, nombre enmascarado, código de operación y monto en soles. Si el monto de la
 constancia difiere del registrado por el banco, **prevalece el dato maestro del banco**: la discrepancia se
 registra y se escala a un operador, nunca se corrige en silencio.
+
+## P-11 · Operación autenticada con OTP
+Si el cliente **desconoce** una operación (sin consentimiento) pero esta fue **autenticada con el OTP del propio
+cliente**, el sistema **no reembolsa ni anula de forma automática**: es un indicio de posible ingeniería social
+o de uso compartido del código. El caso se **escala a un operador**, que verifica con el cliente. Si la operación
+se procesó **sin OTP**, es un indicio fuerte de fraude y sigue el flujo normal de reclamo (P-01 / P-03), con
+aprobación humana.

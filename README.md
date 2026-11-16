@@ -29,7 +29,7 @@ Detalle en [`docs/arquitectura.md`](docs/arquitectura.md).
 | ODBC Driver 18 para SQL Server | 18.x |
 | SQL Server / **Azure SQL** | SQL Server 2025 (LocalDB) en desarrollo; Azure SQL en producción |
 | Azure OpenAI | deployments: chat, router, whisper, tts, embeddings |
-| Docker (opcional) | para Qdrant, OTel, Jaeger, MailHog y Liquibase |
+| Docker (opcional) | para OTel, Jaeger, MailHog y Liquibase (Qdrant Cloud y Azure SQL son servicios externos) |
 
 ## Instalación
 
@@ -50,7 +50,9 @@ docker compose --profile migrar run --rm liquibase
 python scripts/aplicar_esquema.py            # añade --reset para recrear
 ```
 
-El esquema vive en `db/changelog/db.changelog-master.yaml` + `db/changelog/sql/*.sql` (cada changeSet con *rollback*).
+El esquema vive en `db/changelog/db.changelog-master.yaml` (incluye `db/changelog/changes/001..009-*.yaml`, cambios YAML nativos de Liquibase con *rollback*).
+Datos de prueba de fraude (operaciones con/sin OTP, política P-11): `python scripts/cargar_datos_fraude.py` (carga `db/datos_prueba_fraude_otp.sql`; ejecútelo después de `seed_db.py`).
+> `aplicar_esquema.py --reset` elimina **todas** las tablas de la base: úselo solo en una base exclusiva de este proyecto.
 Las tablas del checkpointer (`checkpoints`, `checkpoint_blobs`, `checkpoint_writes`) las crea `SqlServerSaver.setup()` al iniciar.
 
 ## CASO_ID y SEMILLA
@@ -60,7 +62,7 @@ Las tablas del checkpointer (`checkpoints`, `checkpoint_blobs`, `checkpoint_writ
 ```powershell
 python scripts/seed_db.py --caso-id C-07 --semilla 4213        # carga el escenario en la BD
 python scripts/generar_datos.py --caso-id C-07 --semilla 4213  # datos/constancia.png + datos/reporte.(wav|mp3)
-python scripts/ingestar_politicas.py                           # indexa P-01..P-10 en Qdrant (idempotente)
+python scripts/ingestar_politicas.py                           # indexa P-01..P-11 en Qdrant (idempotente)
 ```
 
 ## Ejecución
@@ -78,17 +80,18 @@ python scripts/hitl_cli.py listar
 python scripts/hitl_cli.py decidir APR-XXXXXXXXXX APROBADA "validado" --aprobador ana --rol SUPERVISOR
 ```
 
-Tipos de caso: `DUPLICADA`, `SIN_CONSENTIMIENTO`, `MONTO_DISCREPANTE`, `TARJETA_DESHABILITADA`, `SIN_EVIDENCIA`, `AJENA`, `MONEDA_USD`.
+Tipos de caso: `DUPLICADA`, `SIN_CONSENTIMIENTO` (operación sin OTP → reclamo normal), `SIN_CONSENTIMIENTO_CON_OTP` (operación validada con OTP → escala a operador, P-11; solo con `--tipo`), `MONTO_DISCREPANTE`, `TARJETA_DESHABILITADA`, `SIN_EVIDENCIA`, `AJENA`, `MONEDA_USD`.
 
 ## Pruebas y evidencia
 
 ```powershell
 python scripts/smoke_test.py          # 7 escenarios + ciclo HITL, extremo a extremo (segundos con mock)
-python -m pytest tests                # unitarias + flujos + adversariales + API + persistencia
+python -m pytest tests                # unitarias + flujos + adversariales + API + persistencia (IA mock y SQL simulado: ~20 s, sin red)
+RUN_INTEGRACION=1 python -m pytest tests   # igual, pero contra la BD real de .env (la recarga) e incluye pruebas entre procesos
 python scripts/resumen_metricas.py    # p50/p95, errores, aprobaciones, tokens/costo desde evidencia/trazas.jsonl
 ```
 
-> Las pruebas **recargan los datos de negocio** de la BD de `.env`: use una base de desarrollo.
+> Por defecto las pruebas **no tocan ninguna BD real**. Con `RUN_INTEGRACION=1` sí **recargan los datos de negocio** de la BD de `.env`: use una base de desarrollo (en PowerShell: `$env:RUN_INTEGRACION="1"; python -m pytest tests`).
 
 Evidencia: `evidencia/trazas.jsonl`, `logs.jsonl`, `metricas.jsonl`, `resumen_metricas.md`, `pruebas/`, `fallas/`.
 Con `docker compose up -d` y `OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4317`, las trazas se ven en Jaeger (http://localhost:16686).

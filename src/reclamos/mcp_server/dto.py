@@ -15,6 +15,7 @@ class TransaccionDTO(BaseModel):
     anulada: bool
     canal: str
     grupo_duplicado: str | None = None
+    autenticada_otp: bool = True
     empresa: str
     servicio: str
     tarjeta_ultimos4: str

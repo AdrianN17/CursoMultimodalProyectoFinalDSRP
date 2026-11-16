@@ -1,0 +1,13 @@
+databaseChangeLog:
+  - changeSet:
+      id: 008-parametro-escenario
+      author: reclamos
+      comment: Parámetros del escenario cargados desde la semilla (fecha de referencia, umbral HITL, caso, semilla)
+      changes:
+        - createTable:
+            tableName: ParametroEscenario
+            columns:
+              - column: {name: clave, type: "VARCHAR(40)",   constraints: {primaryKey: true, primaryKeyName: PK_ParametroEscenario, nullable: false}}
+              - column: {name: valor, type: "NVARCHAR(100)", constraints: {nullable: false}}
+      rollback:
+        - dropTable: {tableName: ParametroEscenario}

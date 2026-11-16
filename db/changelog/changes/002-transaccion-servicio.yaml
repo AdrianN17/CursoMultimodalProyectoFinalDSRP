@@ -1,0 +1,62 @@
+databaseChangeLog:
+  - changeSet:
+      id: 002-transaccion-servicio
+      author: reclamos
+      comment: Catálogo de servicios y transacciones (dato maestro)
+      changes:
+        - createTable:
+            tableName: Servicio
+            columns:
+              - column: {name: servicio_id, type: INT,           constraints: {primaryKey: true, primaryKeyName: PK_Servicio, nullable: false}}
+              - column: {name: empresa,     type: "NVARCHAR(60)", constraints: {nullable: false}}
+              - column: {name: servicio,    type: "NVARCHAR(80)", constraints: {nullable: false}}
+              - column: {name: categoria,   type: "VARCHAR(20)",  constraints: {nullable: false}}
+
+        - createTable:
+            tableName: Transaccion
+            columns:
+              - column: {name: transaccion_id,   type: "VARCHAR(30)",   constraints: {primaryKey: true, primaryKeyName: PK_Transaccion, nullable: false}}
+              - column: {name: codigo_operacion, type: "VARCHAR(20)",   constraints: {nullable: false, unique: true, uniqueConstraintName: UQ_Transaccion_codigo}}
+              - column: {name: tarjeta_id,       type: "VARCHAR(20)",   constraints: {nullable: false}}
+              - column: {name: servicio_id,      type: INT,             constraints: {nullable: false}}
+              - column: {name: monto,            type: "DECIMAL(12,2)", constraints: {nullable: false}}
+              - column: {name: moneda,           type: "CHAR(3)",       constraints: {nullable: false}}
+              - column: {name: fecha_hora,       type: DATETIME2,       constraints: {nullable: false}}
+              - column: {name: estado,           type: "VARCHAR(12)",   defaultValue: APROBADA, defaultValueConstraintName: DF_Tx_estado, constraints: {nullable: false}}
+              - column: {name: canal,            type: "VARCHAR(10)",   constraints: {nullable: false}}
+              - column: {name: grupo_duplicado,  type: "VARCHAR(30)"}
+              - column: {name: anulada,          type: BIT, defaultValueBoolean: false, defaultValueConstraintName: DF_Tx_anulada, constraints: {nullable: false}}
+              - column: {name: anulada_en,       type: DATETIME2}
+        - addForeignKeyConstraint:
+            constraintName: FK_Tx_Tarjeta
+            baseTableName: Transaccion
+            baseColumnNames: tarjeta_id
+            referencedTableName: Tarjeta
+            referencedColumnNames: tarjeta_id
+        - addForeignKeyConstraint:
+            constraintName: FK_Tx_Servicio
+            baseTableName: Transaccion
+            baseColumnNames: servicio_id
+            referencedTableName: Servicio
+            referencedColumnNames: servicio_id
+        - sql:
+            dbms: mssql
+            sql: ALTER TABLE Transaccion ADD CONSTRAINT CK_Tx_monto CHECK (monto > 0)
+        - sql:
+            dbms: mssql
+            sql: ALTER TABLE Transaccion ADD CONSTRAINT CK_Tx_moneda CHECK (moneda = 'PEN')
+        - sql:
+            dbms: mssql
+            sql: ALTER TABLE Transaccion ADD CONSTRAINT CK_Tx_estado CHECK (estado IN ('APROBADA','ANULADA','REEMBOLSADA'))
+        - sql:
+            dbms: mssql
+            sql: ALTER TABLE Transaccion ADD CONSTRAINT CK_Tx_canal CHECK (canal IN ('POS','ONLINE','APP'))
+        - createIndex:
+            indexName: IX_Transaccion_tarjeta
+            tableName: Transaccion
+            columns:
+              - column: {name: tarjeta_id}
+              - column: {name: fecha_hora}
+      rollback:
+        - dropTable: {tableName: Transaccion}
+        - dropTable: {tableName: Servicio}

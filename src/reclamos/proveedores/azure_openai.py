@@ -33,8 +33,7 @@ class ProveedorAzure(ProveedorIA):
             messages=[{"role": "system", "content": system},
                       {"role": "user", "content": json.dumps(payload, ensure_ascii=False, default=str)}],
             response_format={"type": "json_object"},
-            temperature=0,
-            max_tokens=900,
+            max_completion_tokens=4000,
         )
         texto = r.choices[0].message.content or "{}"
         uso = Uso(r.usage.prompt_tokens, r.usage.completion_tokens) if r.usage else Uso()
@@ -59,8 +58,7 @@ class ProveedorAzure(ProveedorIA):
                 ]},
             ],
             response_format={"type": "json_object"},
-            temperature=0,
-            max_tokens=600,
+            max_completion_tokens=3000,
         )
         uso = Uso(r.usage.prompt_tokens, r.usage.completion_tokens) if r.usage else Uso()
         return json.loads(r.choices[0].message.content or "{}"), uso, self.s.dep_chat

@@ -1,24 +1,25 @@
 # Pruebas y evidencia
 
-Resultados **reales** de la última ejecución (proveedor IA = *mock*, SQL Server LocalDB, herramientas MCP en proceso para pytest y por *stdio* en el smoke test).
+Resultados de la última ejecución (proveedor IA = *mock*; SQL **simulado con SQLite temporal**, `tests/sql_falso.py`; herramientas MCP en proceso para pytest y por *stdio* en el smoke test).
 
 | Comando | Resultado | Evidencia |
 |---|---|---|
-| `python -m pytest tests -v` | **62 passed en 8.59 s** | `evidencia/pruebas/resultado_pytest.txt` |
+| `python -m pytest tests -v` | **68 passed, 1 skipped en 18.6 s** (el *skipped* es `test_hitl_se_reanuda_desde_otro_proceso`, marcado `integracion`) | `evidencia/pruebas/resultado_pytest.txt` (62 passed, ejecución previa con SQL Server real) |
+| `RUN_INTEGRACION=1 python -m pytest tests -v` | Misma suite contra SQL Server / Azure SQL **reales** (recarga la BD de `.env`; incluye la reanudación del HITL desde otro proceso) | no ejecutado tras añadir P-11 |
 | `python scripts/smoke_test.py` | **RESULTADO: OK** (7 escenarios + ciclo HITL) | `evidencia/pruebas/resultado_smoke_test.txt` |
 | `python main.py … --aprobar APROBADA` | `REEMBOLSO_PROGRAMADO`, `accion_final=REEMBOLSO` | `evidencia/pruebas/demo_duplicada_aprobada.txt` |
 | `python main.py … --aprobar RECHAZADA` | `HITL_RECHAZADO`, `accion_final=NINGUNA` (propuesta: `REEMBOLSO`) | `evidencia/pruebas/demo_duplicada_rechazada.txt` |
 
-> **Alcance honesto:** el proveedor *mock* valida el flujo, las políticas, las tools, el HITL y la persistencia, **no** la calidad de Whisper, la visión ni el TTS reales.
+> **Alcance honesto:** el proveedor *mock* valida el flujo, las políticas, las tools, el HITL y la persistencia, **no** la calidad de Whisper, la visión ni el TTS reales. El SQL simulado (SQLite) **no** valida T-SQL real, `CHECK` ni claves foráneas: eso lo cubre `RUN_INTEGRACION=1` y el script de paridad del esquema.
 > Antes de la entrega, repita `main.py` y `smoke_test.py` con `PROVEEDOR_IA=azure` y guarde esa salida junto a la anterior.
 
 ## Cobertura por archivo
 
 | Archivo | Qué prueba |
 |---|---|
-| `tests/test_unidad.py` | Determinismo de la semilla; validador de constancia; motor de políticas (reglas P-xx, umbral de supervisor, discrepancia, manipulación) |
-| `tests/test_flujos.py` | 7 escenarios (uno por tipo), HITL aprobar/rechazar/expirar, idempotencia, memoria de estado, OTP, adversariales y contradicción |
-| `tests/test_persistencia_herramientas.py` | Checkpoint legible por otra instancia; reanudación del HITL **desde otro proceso**; idempotencia de `crear_ticket`; privacidad de operaciones ajenas; una sola acción por ticket; PII |
+| `tests/test_unidad.py` | Determinismo de la semilla; validador de constancia; motor de políticas (reglas P-xx incl. P-11 operación con/sin OTP, umbral de supervisor, discrepancia, manipulación) |
+| `tests/test_flujos.py` | 8 escenarios (uno por tipo, incl. `SIN_CONSENTIMIENTO_CON_OTP`), HITL aprobar/rechazar/expirar, idempotencia, memoria de estado, OTP, adversariales y contradicción |
+| `tests/test_persistencia_herramientas.py` | Checkpoint legible por otra instancia; reanudación del HITL **desde otro proceso**; idempotencia de `crear_ticket`; privacidad de operaciones ajenas; `autenticada_otp` expuesto por la tool y escalada P-11; una sola acción por ticket; PII |
 | `tests/test_api.py` | OpenAPI, subida multipart, clave de analista, `problem+json`, formatos no admitidos, path traversal del audio |
 
 ## Prueba de contradicción (obligatoria)
@@ -47,6 +48,8 @@ Resultados **reales** de la última ejecución (proveedor IA = *mock*, SQL Serve
 | A10 | Inyección de instrucciones en el relato | Decide el motor; sin reembolso | `test_adv_inyeccion_de_instrucciones_en_el_relato` | PASÓ |
 | A11 | Tarjeta deshabilitada | Escalar a operador (P-06) | `test_escenario_por_tipo[TARJETA_DESHABILITADA]` | PASÓ |
 | A12 | HITL vence sin respuesta | `EXPIRADA`, sin acción, escalado | `test_adv_hitl_expirado_no_actua_y_escala` | PASÓ |
+| A13 | El cliente desconoce una operación que sí validó con OTP | Escalar a operador (P-11), sin reembolso ni anulación | `test_operacion_con_otp_desconocida_escala_y_no_propone_accion_monetaria`, `test_escenario_por_tipo[SIN_CONSENTIMIENTO_CON_OTP]` | PASÓ |
+| A14 | El cliente desconoce una operación procesada **sin** OTP | Flujo de reclamo normal con aprobación humana | `test_sin_consentimiento_y_sin_otp_en_la_operacion_sigue_el_flujo_de_reclamo`, `test_escenario_por_tipo[SIN_CONSENTIMIENTO]` | PASÓ |
 | — | Ejecutar la tool de acción sin aprobación | Rechazo por falta de aprobación | `test_adv_ejecutar_accion_sin_aprobacion_es_rechazado` | PASÓ |
 | — | Aprobar con rol insuficiente | `ROL_INSUFICIENTE` | `test_adv_aprobacion_sin_rol_suficiente` (solo valida si el umbral exige SUPERVISOR) | PASÓ (condicional) |
 

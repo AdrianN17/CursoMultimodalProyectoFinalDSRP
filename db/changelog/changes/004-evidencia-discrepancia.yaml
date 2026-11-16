@@ -1,0 +1,47 @@
+databaseChangeLog:
+  - changeSet:
+      id: 004-evidencia-discrepancia
+      author: reclamos
+      comment: Evidencias recibidas y contradicciones entre fuentes
+      changes:
+        - createTable:
+            tableName: Evidencia
+            columns:
+              - column: {name: evidencia_id,    type: BIGINT, autoIncrement: true, constraints: {primaryKey: true, primaryKeyName: PK_Evidencia, nullable: false}}
+              - column: {name: ticket_id,       type: "VARCHAR(30)",   constraints: {nullable: false}}
+              - column: {name: tipo,            type: "VARCHAR(10)",   constraints: {nullable: false}}
+              - column: {name: sha256,          type: "CHAR(64)",      constraints: {nullable: false}}
+              - column: {name: ruta,            type: "NVARCHAR(260)"}
+              - column: {name: extraccion_json, type: "NVARCHAR(MAX)"}
+              - column: {name: valida,          type: BIT,             constraints: {nullable: false}}
+              - column: {name: creado_en,       type: DATETIME2, defaultValueComputed: SYSUTCDATETIME(), defaultValueConstraintName: DF_Evid_creado, constraints: {nullable: false}}
+        - addForeignKeyConstraint:
+            constraintName: FK_Evid_Ticket
+            baseTableName: Evidencia
+            baseColumnNames: ticket_id
+            referencedTableName: Ticket
+            referencedColumnNames: ticket_id
+        - sql:
+            dbms: mssql
+            sql: ALTER TABLE Evidencia ADD CONSTRAINT CK_Evid_tipo CHECK (tipo IN ('audio','imagen','pdf','texto'))
+
+        - createTable:
+            tableName: Discrepancia
+            columns:
+              - column: {name: discrepancia_id,  type: BIGINT, autoIncrement: true, constraints: {primaryKey: true, primaryKeyName: PK_Discrepancia, nullable: false}}
+              - column: {name: ticket_id,        type: "VARCHAR(30)",   constraints: {nullable: false}}
+              - column: {name: campo,            type: "VARCHAR(40)",   constraints: {nullable: false}}
+              - column: {name: valor_percepcion, type: "NVARCHAR(200)"}
+              - column: {name: valor_maestro,    type: "NVARCHAR(200)"}
+              - column: {name: fuente_ganadora,  type: "VARCHAR(20)",   defaultValue: MAESTRO, defaultValueConstraintName: DF_Disc_fuente, constraints: {nullable: false}}
+              - column: {name: accion,           type: "VARCHAR(30)",   constraints: {nullable: false}}
+              - column: {name: creado_en,        type: DATETIME2, defaultValueComputed: SYSUTCDATETIME(), defaultValueConstraintName: DF_Disc_creado, constraints: {nullable: false}}
+        - addForeignKeyConstraint:
+            constraintName: FK_Disc_Ticket
+            baseTableName: Discrepancia
+            baseColumnNames: ticket_id
+            referencedTableName: Ticket
+            referencedColumnNames: ticket_id
+      rollback:
+        - dropTable: {tableName: Discrepancia}
+        - dropTable: {tableName: Evidencia}

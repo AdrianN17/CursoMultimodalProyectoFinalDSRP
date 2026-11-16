@@ -74,6 +74,8 @@ class DecisionMixin:
             tipo = "ESCALADO_DISCREPANCIA"
         elif "P-06" in d["politicas"]:
             tipo = "ESCALADO_TARJETA"
+        elif "P-11" in d["politicas"]:
+            tipo = "ESCALADO_OTP"
         else:
             tipo = "ESCALADO"
         resumen = (

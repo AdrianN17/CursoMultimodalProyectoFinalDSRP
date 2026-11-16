@@ -1,0 +1,97 @@
+databaseChangeLog:
+  - changeSet:
+      id: 003-ticket-idempotencia-historial
+      author: reclamos
+      comment: Gestión de tickets (idempotencia e historial de eventos)
+      changes:
+        - createTable:
+            tableName: Ticket
+            columns:
+              - column: {name: ticket_id,             type: "VARCHAR(30)",  constraints: {primaryKey: true, primaryKeyName: PK_Ticket, nullable: false}}
+              - column: {name: cliente_id,            type: "VARCHAR(20)",  constraints: {nullable: false}}
+              - column: {name: transaccion_id,        type: "VARCHAR(30)"}
+              - column: {name: tipo_reclamo,          type: "VARCHAR(30)"}
+              - column: {name: estado,                type: "VARCHAR(24)",  defaultValue: ABIERTO, defaultValueConstraintName: DF_Ticket_estado, constraints: {nullable: false}}
+              - column: {name: resolucion,            type: "VARCHAR(20)"}
+              - column: {name: caso_id,               type: "VARCHAR(30)",  constraints: {nullable: false}}
+              - column: {name: semilla,               type: INT,            constraints: {nullable: false}}
+              - column: {name: trace_id,              type: "VARCHAR(40)"}
+              - column: {name: thread_id,             type: "VARCHAR(100)"}
+              - column: {name: accion_ejecutada,      type: "VARCHAR(12)"}
+              - column: {name: transaccion_accion_id, type: "VARCHAR(30)"}
+              - column: {name: creado_en,             type: DATETIME2, defaultValueComputed: SYSUTCDATETIME(), defaultValueConstraintName: DF_Ticket_creado, constraints: {nullable: false}}
+              - column: {name: actualizado_en,        type: DATETIME2, defaultValueComputed: SYSUTCDATETIME(), defaultValueConstraintName: DF_Ticket_act, constraints: {nullable: false}}
+              - column: {name: cerrado_en,            type: DATETIME2}
+        - addForeignKeyConstraint:
+            constraintName: FK_Ticket_Cliente
+            baseTableName: Ticket
+            baseColumnNames: cliente_id
+            referencedTableName: Cliente
+            referencedColumnNames: cliente_id
+        - addForeignKeyConstraint:
+            constraintName: FK_Ticket_Tx
+            baseTableName: Ticket
+            baseColumnNames: transaccion_id
+            referencedTableName: Transaccion
+            referencedColumnNames: transaccion_id
+        - sql:
+            dbms: mssql
+            sql: ALTER TABLE Ticket ADD CONSTRAINT CK_Ticket_estado CHECK (estado IN ('ABIERTO','EN_ANALISIS','PENDIENTE_APROBACION','EN_ESCALAMIENTO','PENDIENTE_TECNICO','CERRADO'))
+        - sql:
+            dbms: mssql
+            sql: ALTER TABLE Ticket ADD CONSTRAINT CK_Ticket_resolucion CHECK (resolucion IS NULL OR resolucion IN ('REEMBOLSO','ANULACION','RECHAZADO','INFORMATIVO','ESCALADO','EXPIRADO'))
+        - sql:
+            dbms: mssql
+            sql: ALTER TABLE Ticket ADD CONSTRAINT CK_Ticket_accion CHECK (accion_ejecutada IS NULL OR accion_ejecutada IN ('ANULACION','REEMBOLSO'))
+        - createIndex:
+            indexName: IX_Ticket_cliente
+            tableName: Ticket
+            columns:
+              - column: {name: cliente_id}
+              - column: {name: creado_en}
+
+        - createTable:
+            tableName: IdempotencyKey
+            columns:
+              - column: {name: idem_key,       type: "VARCHAR(80)",   constraints: {primaryKey: true, primaryKeyName: PK_IdempotencyKey, nullable: false}}
+              - column: {name: scope,          type: "VARCHAR(30)",   constraints: {nullable: false}}
+              - column: {name: request_hash,   type: "CHAR(64)",      constraints: {nullable: false}}
+              - column: {name: ticket_id,      type: "VARCHAR(30)"}
+              - column: {name: respuesta_json, type: "NVARCHAR(MAX)"}
+              - column: {name: creado_en,      type: DATETIME2, defaultValueComputed: SYSUTCDATETIME(), defaultValueConstraintName: DF_Idem_creado, constraints: {nullable: false}}
+        - addForeignKeyConstraint:
+            constraintName: FK_Idem_Ticket
+            baseTableName: IdempotencyKey
+            baseColumnNames: ticket_id
+            referencedTableName: Ticket
+            referencedColumnNames: ticket_id
+
+        - createTable:
+            tableName: TicketEvento
+            columns:
+              - column: {name: evento_id,    type: BIGINT, autoIncrement: true, constraints: {primaryKey: true, primaryKeyName: PK_TicketEvento, nullable: false}}
+              - column: {name: ticket_id,    type: "VARCHAR(30)",  constraints: {nullable: false}}
+              - column: {name: tipo,         type: "VARCHAR(40)",  constraints: {nullable: false}}
+              - column: {name: detalle_json, type: "NVARCHAR(MAX)"}
+              - column: {name: actor,        type: "VARCHAR(12)",  constraints: {nullable: false}}
+              - column: {name: trace_id,     type: "VARCHAR(40)"}
+              - column: {name: ts,           type: DATETIME2, defaultValueComputed: SYSUTCDATETIME(), defaultValueConstraintName: DF_Evento_ts, constraints: {nullable: false}}
+        - addForeignKeyConstraint:
+            constraintName: FK_Evento_Ticket
+            baseTableName: TicketEvento
+            baseColumnNames: ticket_id
+            referencedTableName: Ticket
+            referencedColumnNames: ticket_id
+        - sql:
+            dbms: mssql
+            sql: ALTER TABLE TicketEvento ADD CONSTRAINT CK_Evento_actor CHECK (actor IN ('agente','analista','sistema','cliente'))
+        - createIndex:
+            indexName: IX_TicketEvento_ticket
+            tableName: TicketEvento
+            columns:
+              - column: {name: ticket_id}
+              - column: {name: ts}
+      rollback:
+        - dropTable: {tableName: TicketEvento}
+        - dropTable: {tableName: IdempotencyKey}
+        - dropTable: {tableName: Ticket}

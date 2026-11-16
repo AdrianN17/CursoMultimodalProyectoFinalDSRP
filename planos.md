@@ -5,8 +5,8 @@
 >
 > **Convención:** `CASO_ID` y `SEMILLA` son tus valores individuales. En este documento se usan `C-07` y `4213` **solo como ejemplo** (los del PDF). Reemplázalos por los tuyos en todo el repo, informe, logs y nombre del video.
 >
-> **Implementación vs. plano (diferencias):** el paquete real es `src/reclamos/` (no `src/` plano); el changelog Liquibase es un único `db.changelog-master.yaml` con 8 changeSets
-> (`sqlFile` + rollback) en `db/changelog/sql/`; el checkpointer es un `SqlServerSaver` propio (el paquete comunitario exige Python ≥ 3.12);
+> **Implementación vs. plano (diferencias):** el paquete real es `src/reclamos/` (no `src/` plano); el changelog Liquibase es un `db.changelog-master.yaml` que incluye 9 changeSets en YAML nativo
+> (`db/changelog/changes/*.yaml`, con rollback); el checkpointer es un `SqlServerSaver` propio (el paquete comunitario exige Python ≥ 3.12);
 > `thread_id` = id de **sesión**; las tools viven en `mcp_server/tools.py` (14, lectura y acción juntas); el OTP se verifica antes de la visión.
 > Ver `README.md` y `docs/`.
 

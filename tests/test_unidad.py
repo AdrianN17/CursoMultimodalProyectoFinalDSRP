@@ -104,11 +104,17 @@ def test_motor_reembolsa_si_ya_facturo_y_exige_supervisor_sobre_umbral():
     (dict(accion_previa_en_ticket=True), "RECHAZAR", "P-05"),
     (dict(tx=_tx(tarjeta_habilitada=False)), "ESCALAR_OPERADOR", "P-06"),
     (dict(tx=None), "ESCALAR_OPERADOR", "P-10"),
+    (dict(intencion="SIN_CONSENTIMIENTO", tx=_tx(autenticada_otp=True)), "ESCALAR_OPERADOR", "P-11"),
 ])
 def test_motor_reglas_de_rechazo_escalado_e_informacion(kw, accion, politica):
     d = evaluar(_ctx(**kw))
     assert d.accion == accion and politica in d.politicas
     assert not d.requiere_hitl
+
+
+def test_sin_consentimiento_y_sin_otp_en_la_operacion_sigue_el_flujo_de_reclamo():
+    d = evaluar(_ctx(intencion="SIN_CONSENTIMIENTO", tx=_tx(autenticada_otp=False)))
+    assert d.accion == "ANULACION" and d.requiere_hitl
 
 
 def test_motor_registra_discrepancia_de_monto_con_dato_maestro_ganador():

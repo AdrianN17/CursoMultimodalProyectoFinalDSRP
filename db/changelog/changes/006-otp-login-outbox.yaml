@@ -1,0 +1,76 @@
+databaseChangeLog:
+  - changeSet:
+      id: 006-otp-login-outbox
+      author: reclamos
+      comment: Seguridad de identidad (OTP, login) y correos al operador (outbox)
+      changes:
+        - createTable:
+            tableName: OtpChallenge
+            columns:
+              - column: {name: otp_id,        type: "VARCHAR(30)", constraints: {primaryKey: true, primaryKeyName: PK_OtpChallenge, nullable: false}}
+              - column: {name: cliente_id,    type: "VARCHAR(20)", constraints: {nullable: false}}
+              - column: {name: sesion_id,     type: "VARCHAR(60)", constraints: {nullable: false}}
+              - column: {name: proposito,     type: "VARCHAR(20)", constraints: {nullable: false}}
+              - column: {name: otp_hash,      type: "CHAR(64)",    constraints: {nullable: false}}
+              - column: {name: intentos,      type: INT,           defaultValueNumeric: 0, defaultValueConstraintName: DF_Otp_int, constraints: {nullable: false}}
+              - column: {name: estado,        type: "VARCHAR(12)", defaultValue: PENDIENTE, defaultValueConstraintName: DF_Otp_estado, constraints: {nullable: false}}
+              - column: {name: creado_en,     type: DATETIME2, defaultValueComputed: SYSUTCDATETIME(), defaultValueConstraintName: DF_Otp_creado, constraints: {nullable: false}}
+              - column: {name: expira_en,     type: DATETIME2,     constraints: {nullable: false}}
+              - column: {name: verificado_en, type: DATETIME2}
+        - addForeignKeyConstraint:
+            constraintName: FK_Otp_Cliente
+            baseTableName: OtpChallenge
+            baseColumnNames: cliente_id
+            referencedTableName: Cliente
+            referencedColumnNames: cliente_id
+        - sql:
+            dbms: mssql
+            sql: ALTER TABLE OtpChallenge ADD CONSTRAINT CK_Otp_estado CHECK (estado IN ('PENDIENTE','VERIFICADO','FALLIDO','EXPIRADO'))
+        - createIndex:
+            indexName: IX_Otp_sesion
+            tableName: OtpChallenge
+            columns:
+              - column: {name: sesion_id}
+              - column: {name: creado_en}
+
+        - createTable:
+            tableName: LoginTrack
+            columns:
+              - column: {name: login_id,   type: BIGINT, autoIncrement: true, constraints: {primaryKey: true, primaryKeyName: PK_LoginTrack, nullable: false}}
+              - column: {name: cliente_id, type: "VARCHAR(20)", constraints: {nullable: false}}
+              - column: {name: sesion_id,  type: "VARCHAR(60)", constraints: {nullable: false}}
+              - column: {name: canal,      type: "VARCHAR(12)", constraints: {nullable: false}}
+              - column: {name: ip_hash,    type: "CHAR(64)"}
+              - column: {name: resultado,  type: "VARCHAR(20)", constraints: {nullable: false}}
+              - column: {name: ts,         type: DATETIME2, defaultValueComputed: SYSUTCDATETIME(), defaultValueConstraintName: DF_Login_ts, constraints: {nullable: false}}
+        - addForeignKeyConstraint:
+            constraintName: FK_Login_Cliente
+            baseTableName: LoginTrack
+            baseColumnNames: cliente_id
+            referencedTableName: Cliente
+            referencedColumnNames: cliente_id
+
+        - createTable:
+            tableName: EmailOutbox
+            columns:
+              - column: {name: email_id,   type: BIGINT, autoIncrement: true, constraints: {primaryKey: true, primaryKeyName: PK_EmailOutbox, nullable: false}}
+              - column: {name: ticket_id,  type: "VARCHAR(30)",   constraints: {nullable: false}}
+              - column: {name: destino,    type: "NVARCHAR(120)", constraints: {nullable: false}}
+              - column: {name: asunto,     type: "NVARCHAR(200)", constraints: {nullable: false}}
+              - column: {name: cuerpo,     type: "NVARCHAR(MAX)", constraints: {nullable: false}}
+              - column: {name: estado,     type: "VARCHAR(12)",   defaultValue: PENDIENTE, defaultValueConstraintName: DF_Email_estado, constraints: {nullable: false}}
+              - column: {name: creado_en,  type: DATETIME2, defaultValueComputed: SYSUTCDATETIME(), defaultValueConstraintName: DF_Email_creado, constraints: {nullable: false}}
+              - column: {name: enviado_en, type: DATETIME2}
+        - addForeignKeyConstraint:
+            constraintName: FK_Email_Ticket
+            baseTableName: EmailOutbox
+            baseColumnNames: ticket_id
+            referencedTableName: Ticket
+            referencedColumnNames: ticket_id
+        - sql:
+            dbms: mssql
+            sql: ALTER TABLE EmailOutbox ADD CONSTRAINT CK_Email_estado CHECK (estado IN ('PENDIENTE','ENVIADO','ERROR'))
+      rollback:
+        - dropTable: {tableName: EmailOutbox}
+        - dropTable: {tableName: LoginTrack}
+        - dropTable: {tableName: OtpChallenge}

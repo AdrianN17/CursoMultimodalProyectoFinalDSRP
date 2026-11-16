@@ -121,7 +121,7 @@ def consultar_transaccion(cliente_id: str, codigo_operacion: str, trace_id: str 
     with db.conexion() as cn:
         f = db.uno(
             "SELECT t.transaccion_id, t.codigo_operacion, t.monto, t.moneda, t.fecha_hora, t.estado, t.anulada, "
-            "t.canal, t.grupo_duplicado, s.empresa, s.servicio, tr.ultimos4, tr.producto, tr.habilitada, "
+            "t.canal, t.grupo_duplicado, t.autenticada_otp, s.empresa, s.servicio, tr.ultimos4, tr.producto, tr.habilitada, "
             "tr.dia_facturacion, cu.cliente_id AS duenio "
             "FROM Transaccion t JOIN Tarjeta tr ON tr.tarjeta_id = t.tarjeta_id "
             "JOIN Cuenta cu ON cu.cuenta_id = tr.cuenta_id JOIN Servicio s ON s.servicio_id = t.servicio_id "
@@ -134,7 +134,8 @@ def consultar_transaccion(cliente_id: str, codigo_operacion: str, trace_id: str 
     return TransaccionDTO(
         transaccion_id=f["transaccion_id"], codigo_operacion=f["codigo_operacion"], monto=float(f["monto"]),
         moneda=f["moneda"], fecha_hora=_f(f["fecha_hora"]), estado=f["estado"], anulada=bool(f["anulada"]),
-        canal=f["canal"], grupo_duplicado=f["grupo_duplicado"], empresa=f["empresa"], servicio=f["servicio"],
+        canal=f["canal"], grupo_duplicado=f["grupo_duplicado"],
+        autenticada_otp=bool(f["autenticada_otp"]), empresa=f["empresa"], servicio=f["servicio"],
         tarjeta_ultimos4=f["ultimos4"], tarjeta_producto=f["producto"], tarjeta_habilitada=bool(f["habilitada"]),
         dia_facturacion=int(f["dia_facturacion"]),
         facturada=esta_facturada(f["fecha_hora"].date(), ref, int(f["dia_facturacion"])),

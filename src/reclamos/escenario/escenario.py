@@ -10,6 +10,7 @@ Elementos del escenario que la semilla modifica (cada uno cambia la decisión de
   5. Umbral de monto para aprobación reforzada (rol SUPERVISOR) en el HITL.
   6. Datos de la constancia de pago (fecha, hora, monto, código) usados para generar la imagen.
   7. OTP simulado del cliente.
+  8. Si la operación reclamada se autenticó con OTP o no (indicio de fraude, política P-11).
 
 `tipo` puede forzarse (pruebas/demo) pero todos los demás valores siguen dependiendo de la semilla.
 """
@@ -30,8 +31,9 @@ TIPOS_CASO = [
     "SIN_EVIDENCIA",
     "AJENA",
     "MONEDA_USD",
+    "SIN_CONSENTIMIENTO_CON_OTP",
 ]
-PESOS_TIPO = [3, 3, 2, 1, 1, 1, 1]
+PESOS_TIPO = [3, 3, 2, 1, 1, 1, 1, 0]  # peso 0: solo se obtiene forzando --tipo (mantiene reproducibles las semillas previas)
 MESES = ["ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "sep", "oct", "nov", "dic"]
 
 NOMBRES = ["Adriana", "Bruno", "Carla", "Diego", "Elena", "Fabio", "Gloria", "Hugo", "Irene", "Jorge"]
@@ -94,6 +96,7 @@ class TransaccionSeed:
     fecha_hora: datetime
     canal: str
     grupo_duplicado: str | None = None
+    autenticada_otp: bool = True
 
 
 @dataclass
@@ -128,6 +131,7 @@ class Escenario:
             "SIN_EVIDENCIA": "PEDIR_INFO",
             "AJENA": "RECHAZAR",
             "MONEDA_USD": "NO_DISPONIBLE_MONEDA",
+            "SIN_CONSENTIMIENTO_CON_OTP": "ESCALAR_OPERADOR",
         }[self.tipo]
 
 
@@ -174,7 +178,7 @@ def construir_escenario(caso_id: str, semilla: int, tipo: str | None = None) -> 
     # --- elemento 1: datos maestros -----------------------------------------------------------
     monto = round(rng.uniform(40, 2600), 2)
     servicio = rng.choice(CATALOGO_SERVICIOS)
-    if tipo_final == "SIN_CONSENTIMIENTO":
+    if tipo_final in ("SIN_CONSENTIMIENTO", "SIN_CONSENTIMIENTO_CON_OTP"):
         servicio = CATALOGO_SERVICIOS[5]
     codigos: set[str] = set()
 
@@ -220,10 +224,14 @@ def construir_escenario(caso_id: str, semilla: int, tipo: str | None = None) -> 
     duenio_tx = tarj_otro if tipo_final == "AJENA" else tarj
 
     codigo = nuevo_codigo()
-    canal = "ONLINE" if tipo_final == "SIN_CONSENTIMIENTO" else rng.choice(["POS", "ONLINE", "APP"])
+    canal = "ONLINE" if tipo_final in ("SIN_CONSENTIMIENTO", "SIN_CONSENTIMIENTO_CON_OTP") \
+        else rng.choice(["POS", "ONLINE", "APP"])
     grupo = f"DUP-{rng.randint(100, 999)}" if tipo_final == "DUPLICADA" else None
     principal = TransaccionSeed(f"TX-{codigo}", codigo, duenio_tx.tarjeta_id, servicio.servicio_id, monto,
                                 hora_op, canal, grupo)
+    # --- elemento 8: autenticación OTP de la operación (indicio de fraude, P-11) -------------
+    # Quien desconoce una compra "sin OTP" tiene un reclamo fuerte; con OTP validado se escala a un operador.
+    principal.autenticada_otp = tipo_final not in ("SIN_CONSENTIMIENTO", "TARJETA_DESHABILITADA")
     esc.transacciones.append(principal)
     esc.tx_principal_codigo = esc.tx_objetivo_codigo = codigo
 
@@ -234,6 +242,7 @@ def construir_escenario(caso_id: str, semilla: int, tipo: str | None = None) -> 
             hora_op + timedelta(minutes=rng.randint(1, 4)), canal, grupo))
         esc.tx_objetivo_codigo = c2  # la anulable es la repetida (la segunda)
 
+    n_previas = len(esc.transacciones)
     for tarjeta_dec, n_dec in ((tarj, rng.randint(3, 5)), (tarj_otro, 2)):
         for _ in range(n_dec):
             s = rng.choice(CATALOGO_SERVICIOS)
@@ -244,6 +253,10 @@ def construir_escenario(caso_id: str, semilla: int, tipo: str | None = None) -> 
                 f"TX-{c}", c, tarjeta_dec.tarjeta_id, s.servicio_id, round(rng.uniform(15, 600), 2), dt,
                 rng.choice(["POS", "ONLINE", "APP"])))
 
+    # RNG aparte: así el resto del escenario no cambia respecto a semillas anteriores.
+    rng_otp = random.Random(f"{caso_id}:{semilla}:otp")
+    for tx in esc.transacciones[n_previas:]:
+        tx.autenticada_otp = rng_otp.random() > 0.25  # ~25 % de operaciones de relleno sin OTP
     # --- elemento 6: contenido de la constancia (imagen) --------------------------------------
     cliente_dueno = esc.clientes[1] if tipo_final == "AJENA" else esc.clientes[0]
     sufijo5 = f"{rng.randint(1, 9)}{duenio_tx.ultimos4}"
@@ -278,6 +291,8 @@ def _relato(tipo: str, empresa: str, monto: float, monto_img_txt: str) -> str:
                      f"Adjunto mi constancia de pago. Quiero que me devuelvan el dinero.",
         "SIN_CONSENTIMIENTO": f"Hola, no reconozco el cobro de {m} en {empresa}. Yo no autoricé "
                               f"esa operación. Adjunto la constancia que me llegó.",
+        "SIN_CONSENTIMIENTO_CON_OTP": f"Hola, no reconozco el cobro de {m} en {empresa}. Yo no autoricé "
+                                      f"esa operación. Adjunto la constancia que me llegó.",
         "MONTO_DISCREPANTE": f"Hola, hice una compra en {empresa} pero el importe cobrado es incorrecto, "
                              f"me cobraron {m}. Adjunto mi constancia de pago.",
         "TARJETA_DESHABILITADA": f"Hola, no reconozco el cobro de {m} en {empresa}, no lo autoricé. "

@@ -106,6 +106,10 @@ class ProveedorMock(ProveedorIA):
         if not maestro.get("tarjeta_habilitada", True):
             out.update(accion_propuesta="ESCALAR_OPERADOR", politicas_aplicables=["P-06"], confianza=0.9,
                        explicacion="La tarjeta está deshabilitada; un operador coordina el medio de reembolso.")
+        elif intencion == "SIN_CONSENTIMIENTO" and maestro.get("autenticada_otp", True):
+            out.update(accion_propuesta="ESCALAR_OPERADOR", politicas_aplicables=["P-11"], confianza=0.9,
+                       explicacion="La operación fue validada con OTP del cliente; posible ingeniería social, "
+                                   "se escala a un operador.")
         else:
             accion = "REEMBOLSO" if maestro.get("facturada") else "ANULACION"
             out.update(accion_propuesta=accion, requiere_hitl=True, confianza=0.85,

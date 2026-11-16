@@ -1,4 +1,4 @@
-"""Motor de reglas de políticas de reclamación (P-01 … P-10). El motor DECIDE; el LLM explica.
+"""Motor de reglas de políticas de reclamación (P-01 … P-11). El motor DECIDE; el LLM explica.
 
 Decisiones monetarias reproducibles y auditables: la misma entrada produce siempre la misma salida.
 """
@@ -67,6 +67,11 @@ def evaluar(c: ContextoPolitica) -> Decision:
                                  "maestro": f"{float(tx['monto']):.2f}"}])
     if c.intencion not in INTENCIONES_RECLAMABLES:
         return d("ESCALAR_OPERADOR", ["P-01"], f"MOTIVO_NO_CUBIERTO_AUTOMATICAMENTE ({c.intencion})")
+
+    if c.intencion == "SIN_CONSENTIMIENTO" and tx.get("autenticada_otp", True):
+        return d("ESCALAR_OPERADOR", ["P-11"],
+                 "OPERACION_AUTENTICADA_CON_OTP: el cliente desconoce una operación validada con su OTP; "
+                 "posible ingeniería social, no se reembolsa de forma automática")
 
     objetivo = tx
     if c.intencion == "DUPLICADO":

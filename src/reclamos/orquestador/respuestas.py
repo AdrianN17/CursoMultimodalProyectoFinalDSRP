@@ -66,6 +66,9 @@ def texto_para(tipo: str, d: dict[str, Any]) -> str:
     if tipo == "ESCALADO_TARJETA":
         return (f"La tarjeta de la compra no está habilitada, por lo que un operador coordinará con usted el medio de "
                 f"reembolso por correo.{ref}")
+    if tipo == "ESCALADO_OTP":
+        return (f"Esa operación fue confirmada con su código de verificación, por lo que su caso será revisado "
+                f"por un operador, que se comunicará con usted por correo.{ref}")
     if tipo == "ESCALADO_HITL_EXPIRADO":
         return f"Su reclamo no pudo ser revisado a tiempo y fue derivado a un operador, que se comunicará con usted.{ref}"
     if tipo == "ESCALADO":

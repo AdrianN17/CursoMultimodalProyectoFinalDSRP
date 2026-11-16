@@ -124,7 +124,7 @@ class DatosMixin:
         maestro = None if not tx else (
             {"pertenece_al_cliente": False} if not propia else
             {k: tx[k] for k in ("monto", "fecha_hora", "estado", "anulada", "canal", "tarjeta_habilitada", "facturada",
-                                "grupo_duplicado", "pertenece_al_cliente")})
+                                "grupo_duplicado", "autenticada_otp", "pertenece_al_cliente")})
         cons = s.get("constancia")
         payload = {
             "transcripcion": s.get("transcripcion", ""), "origen_relato": s.get("origen_relato", "texto"),

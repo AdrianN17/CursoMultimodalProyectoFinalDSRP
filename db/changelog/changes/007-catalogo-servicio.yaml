@@ -1,0 +1,15 @@
+databaseChangeLog:
+  - changeSet:
+      id: 007-catalogo-servicio
+      author: reclamos
+      context: catalogo
+      comment: Catálogo estático de empresas/servicios (ficticios). Debe coincidir con CATALOGO_SERVICIOS en escenario.py
+      changes:
+        - insert: {tableName: Servicio, columns: [{column: {name: servicio_id, valueNumeric: 1}}, {column: {name: empresa, value: Pluz Energia}}, {column: {name: servicio, value: SERVICIO DE ELECTRICIDAD}}, {column: {name: categoria, value: LUZ}}]}
+        - insert: {tableName: Servicio, columns: [{column: {name: servicio_id, valueNumeric: 2}}, {column: {name: empresa, value: Aguas del Sur}}, {column: {name: servicio, value: SERVICIO DE AGUA POTABLE}}, {column: {name: categoria, value: AGUA}}]}
+        - insert: {tableName: Servicio, columns: [{column: {name: servicio_id, valueNumeric: 3}}, {column: {name: empresa, value: TeleNova}}, {column: {name: servicio, value: SERVICIO DE INTERNET Y TELEFONIA}}, {column: {name: categoria, value: TELECOM}}]}
+        - insert: {tableName: Servicio, columns: [{column: {name: servicio_id, valueNumeric: 4}}, {column: {name: empresa, value: GasAndes}}, {column: {name: servicio, value: SERVICIO DE GAS NATURAL}}, {column: {name: categoria, value: GAS}}]}
+        - insert: {tableName: Servicio, columns: [{column: {name: servicio_id, valueNumeric: 5}}, {column: {name: empresa, value: Supermercados Delta}}, {column: {name: servicio, value: COMPRA CON TARJETA}}, {column: {name: categoria, value: RETAIL}}]}
+        - insert: {tableName: Servicio, columns: [{column: {name: servicio_id, valueNumeric: 6}}, {column: {name: empresa, value: Nube Market}}, {column: {name: servicio, value: COMPRA ONLINE}}, {column: {name: categoria, value: ONLINE}}]}
+      rollback:
+        - delete: {tableName: Servicio}

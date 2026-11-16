@@ -10,7 +10,7 @@ from dotenv import load_dotenv
 RAIZ = Path(__file__).resolve().parents[2]
 load_dotenv(RAIZ / ".env")
 
-AGENTE_VERSION = "1.0.0"
+AGENTE_VERSION = "1.1.0"
 
 
 def _bool(valor: str | None, defecto: bool = False) -> bool:
@@ -40,6 +40,7 @@ class Settings:
     sql_driver: str
     sql_trusted: bool
     qdrant_url: str
+    qdrant_api_key: str
     qdrant_path: str
     qdrant_coleccion: str
     otel_endpoint: str
@@ -98,6 +99,7 @@ def get_settings() -> Settings:
         sql_driver=e("AZURE_SQL_DRIVER", "ODBC Driver 18 for SQL Server"),
         sql_trusted=_bool(e("AZURE_SQL_TRUSTED"), False),
         qdrant_url=e("QDRANT_URL", ""),
+        qdrant_api_key=e("QDRANT_API_KEY", ""),
         qdrant_path=e("QDRANT_PATH", str(RAIZ / ".qdrant_local")),
         qdrant_coleccion=e("QDRANT_COLECCION", "politicas_reclamacion"),
         otel_endpoint=e("OTEL_EXPORTER_OTLP_ENDPOINT", ""),

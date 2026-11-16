@@ -1,13 +1,8 @@
-# Servicios de apoyo. La base de datos es Azure SQL (externa); para trabajo 100 % local use el perfil "sqlserver-local".
-#   docker compose up -d qdrant otel-collector jaeger mailhog      -> infraestructura
+# Servicios de apoyo. La base de datos (Azure SQL) y Qdrant (Qdrant Cloud) son externos y se configuran en .env.
+#   docker compose up -d otel-collector jaeger mailhog             -> infraestructura
 #   docker compose --profile migrar run --rm liquibase             -> aplica db/changelog sobre Azure SQL
 #   docker compose --profile app up --build                        -> API + UI en http://localhost:8000
 services:
-  qdrant:
-    image: qdrant/qdrant:v1.12.4
-    ports: ["6333:6333"]
-    volumes: ["qdrant_data:/qdrant/storage"]
-
   jaeger:
     image: jaegertracing/all-in-one:1.62.0
     environment: { COLLECTOR_OTLP_ENABLED: "true" }
@@ -35,23 +30,13 @@ services:
       LIQUIBASE_COMMAND_PASSWORD: ${AZURE_SQL_PASSWORD}
     command: ["--defaults-file=liquibase.properties", "update"]
 
-  sqlserver-local:
-    profiles: ["sqlserver-local"]
-    image: mcr.microsoft.com/mssql/server:2022-latest
-    environment: { ACCEPT_EULA: "Y", MSSQL_SA_PASSWORD: "${LOCAL_SA_PASSWORD:-Cambiar_Esta_Clave_1}" }
-    ports: ["1433:1433"]
-
   api:
     profiles: ["app"]
     build: .
     env_file: .env
     environment:
-      QDRANT_URL: http://qdrant:6333
       OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4317
       SMTP_HOST: mailhog
     ports: ["8000:8000"]
     volumes: ["./evidencia:/app/evidencia", "./datos:/app/datos"]
-    depends_on: [qdrant, otel-collector, mailhog]
-
-volumes:
-  qdrant_data: {}
+    depends_on: [otel-collector, mailhog]

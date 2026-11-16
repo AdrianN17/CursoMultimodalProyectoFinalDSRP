@@ -23,7 +23,7 @@ flowchart LR
   G --> PRV[ProveedorIA<br/>Azure OpenAI]
   G --> MCP[Cliente MCP]
   MCP --> SRV[Servidor MCP<br/>tools tipadas] --> DB[(Azure SQL<br/>dato maestro)]
-  G --> RAG[Qdrant<br/>políticas P-01..P-10]
+  G --> RAG[Qdrant<br/>políticas P-01..P-11]
   G -. interrupt .-> HITL[Analista: aprobar / rechazar]
   HITL --> API2[/aprobaciones/{id}/decision/] --> SVC
   G --> TTS[TTS] --> A[Respuesta solo en audio]
@@ -54,6 +54,18 @@ flowchart TD
 ```
 
 El OTP se verifica **antes** de la visión: no se gasta cómputo ni se expone nada a un usuario no autenticado.
+
+### Señal de fraude: operación con / sin OTP (P-11)
+
+`Transaccion.autenticada_otp` (changeSet `009`) es **dato maestro**: indica si la operación original se confirmó con el OTP del cliente. No es el OTP del formulario (ese autentica a quien reclama; ver `seguridad/otp.py`).
+Cuando el cliente **desconoce** una operación (`SIN_CONSENTIMIENTO`), `politicas/motor.py` decide:
+
+| `autenticada_otp` | Decisión | Motivo |
+|---|---|---|
+| `1` (con OTP) | `ESCALAR_OPERADOR` (P-11), sin acción monetaria | Posible ingeniería social o código compartido: lo verifica un humano |
+| `0` (sin OTP) | Flujo normal: `ANULACION` / `REEMBOLSO` con aprobación humana (P-01 / P-03) | Indicio fuerte de fraude |
+
+Datos de prueba: `db/datos_prueba_fraude_otp.sql` (`python scripts/cargar_datos_fraude.py`) y los tipos de escenario `SIN_CONSENTIMIENTO` (sin OTP) y `SIN_CONSENTIMIENTO_CON_OTP` (con OTP).
 
 ## 4. Las nueve capas
 
@@ -92,6 +104,7 @@ El OTP se verifica **antes** de la visión: no se gasta cómputo ni se expone na
 
 - Autenticación real (el OTP es de demostración), antifraude y detección de comprobantes falsificados no están implementados.
 - Constancia solo en imagen (PNG/JPG); sin PDF ni multi-idioma.
-- Qdrant en modo local admite un solo proceso; para producción use `QDRANT_URL`.
+- Qdrant en modo local admite un solo proceso; para producción use `QDRANT_URL` (Qdrant Cloud) y `QDRANT_API_KEY`.
+- `pytest` fuerza Qdrant local (`.qdrant_test/`) y SQL simulado: los embeddings *mock* (256 dim) no deben tocar una colección real indexada con embeddings de 1536 dim.
 - El runner Liquibase en Docker no se pudo ejecutar en el entorno de desarrollo (sin Docker/Java): el esquema se validó con `scripts/aplicar_esquema.py` sobre el mismo changelog.
 - La ruta Azure OpenAI (`proveedores/azure_openai.py`) requiere credenciales reales; **no se ejecutó** en este entorno (las pruebas usan el proveedor *mock*).

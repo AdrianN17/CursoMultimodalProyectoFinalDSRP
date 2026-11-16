@@ -4,6 +4,7 @@ __pycache__/
 *.pyc
 .pytest_cache/
 .qdrant_local/
+.qdrant_test/
 datos/salidas/
 datos/*.wav
 datos/*.mp3

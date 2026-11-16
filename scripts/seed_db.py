@@ -59,9 +59,10 @@ def cargar(esc: Escenario) -> None:
         for tx in esc.transacciones:
             c.execute(
                 "INSERT INTO Transaccion (transaccion_id, codigo_operacion, tarjeta_id, servicio_id, monto, "
-                "moneda, fecha_hora, canal, grupo_duplicado) VALUES (?, ?, ?, ?, ?, 'PEN', ?, ?, ?)",
+                "moneda, fecha_hora, canal, grupo_duplicado, autenticada_otp) "
+                "VALUES (?, ?, ?, ?, ?, 'PEN', ?, ?, ?, ?)",
                 (tx.transaccion_id, tx.codigo_operacion, tx.tarjeta_id, tx.servicio_id, tx.monto,
-                 tx.fecha_hora, tx.canal, tx.grupo_duplicado),
+                 tx.fecha_hora, tx.canal, tx.grupo_duplicado, int(tx.autenticada_otp)),
             )
         params = {
             "caso_id": esc.caso_id,

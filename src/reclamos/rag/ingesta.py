@@ -35,7 +35,8 @@ def obtener_cliente() -> QdrantClient:
     clave = s.qdrant_url or s.qdrant_path
     with _LOCK:
         if clave not in _CLIENTES:
-            _CLIENTES[clave] = QdrantClient(url=s.qdrant_url) if s.qdrant_url else QdrantClient(path=s.qdrant_path)
+            _CLIENTES[clave] = (QdrantClient(url=s.qdrant_url, api_key=s.qdrant_api_key or None)
+                                if s.qdrant_url else QdrantClient(path=s.qdrant_path))
         return _CLIENTES[clave]
 
 
