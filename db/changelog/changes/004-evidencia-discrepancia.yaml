@@ -23,7 +23,7 @@ databaseChangeLog:
             referencedColumnNames: ticket_id
         - sql:
             dbms: mssql
-            sql: ALTER TABLE Evidencia ADD CONSTRAINT CK_Evid_tipo CHECK (tipo IN ('audio','imagen','pdf','texto'))
+            sql: ALTER TABLE ${database.defaultSchemaName}.Evidencia ADD CONSTRAINT CK_Evid_tipo CHECK (tipo IN ('audio','imagen','pdf','texto'))
 
         - createTable:
             tableName: Discrepancia

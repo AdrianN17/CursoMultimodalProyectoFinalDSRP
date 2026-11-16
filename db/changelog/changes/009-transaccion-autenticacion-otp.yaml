@@ -11,4 +11,4 @@ databaseChangeLog:
       rollback:
         - sql:
             dbms: mssql
-            sql: ALTER TABLE Transaccion DROP CONSTRAINT DF_Tx_otp; ALTER TABLE Transaccion DROP COLUMN autenticada_otp;
+            sql: ALTER TABLE ${database.defaultSchemaName}.Transaccion DROP CONSTRAINT DF_Tx_otp; ALTER TABLE ${database.defaultSchemaName}.Transaccion DROP COLUMN autenticada_otp;

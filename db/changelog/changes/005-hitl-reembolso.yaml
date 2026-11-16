@@ -34,13 +34,13 @@ databaseChangeLog:
             referencedColumnNames: transaccion_id
         - sql:
             dbms: mssql
-            sql: ALTER TABLE AprobacionHitl ADD CONSTRAINT CK_Aprob_accion CHECK (accion_propuesta IN ('ANULACION','REEMBOLSO'))
+            sql: ALTER TABLE ${database.defaultSchemaName}.AprobacionHitl ADD CONSTRAINT CK_Aprob_accion CHECK (accion_propuesta IN ('ANULACION','REEMBOLSO'))
         - sql:
             dbms: mssql
-            sql: ALTER TABLE AprobacionHitl ADD CONSTRAINT CK_Aprob_rol CHECK (rol_requerido IN ('ANALISTA','SUPERVISOR'))
+            sql: ALTER TABLE ${database.defaultSchemaName}.AprobacionHitl ADD CONSTRAINT CK_Aprob_rol CHECK (rol_requerido IN ('ANALISTA','SUPERVISOR'))
         - sql:
             dbms: mssql
-            sql: ALTER TABLE AprobacionHitl ADD CONSTRAINT CK_Aprob_estado CHECK (estado IN ('PENDIENTE','APROBADA','RECHAZADA','EXPIRADA'))
+            sql: ALTER TABLE ${database.defaultSchemaName}.AprobacionHitl ADD CONSTRAINT CK_Aprob_estado CHECK (estado IN ('PENDIENTE','APROBADA','RECHAZADA','EXPIRADA'))
         # Una sola aprobación vigente por ticket y acción
         - createIndex:
             indexName: UX_Aprob_ticket_accion
@@ -77,10 +77,10 @@ databaseChangeLog:
             referencedColumnNames: transaccion_id
         - sql:
             dbms: mssql
-            sql: ALTER TABLE Reembolso ADD CONSTRAINT CK_Reemb_tipo CHECK (tipo IN ('REEMBOLSO','ANULACION'))
+            sql: ALTER TABLE ${database.defaultSchemaName}.Reembolso ADD CONSTRAINT CK_Reemb_tipo CHECK (tipo IN ('REEMBOLSO','ANULACION'))
         - sql:
             dbms: mssql
-            sql: ALTER TABLE Reembolso ADD CONSTRAINT CK_Reemb_estado CHECK (estado IN ('PROGRAMADO','PAGADO'))
+            sql: ALTER TABLE ${database.defaultSchemaName}.Reembolso ADD CONSTRAINT CK_Reemb_estado CHECK (estado IN ('PROGRAMADO','PAGADO'))
         # Una sola anulación/reembolso por reclamo (política P-05)
         - createIndex:
             indexName: UX_Reembolso_ticket

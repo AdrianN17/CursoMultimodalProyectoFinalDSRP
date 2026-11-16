@@ -25,7 +25,7 @@ databaseChangeLog:
             referencedColumnNames: cliente_id
         - sql:
             dbms: mssql
-            sql: ALTER TABLE OtpChallenge ADD CONSTRAINT CK_Otp_estado CHECK (estado IN ('PENDIENTE','VERIFICADO','FALLIDO','EXPIRADO'))
+            sql: ALTER TABLE ${database.defaultSchemaName}.OtpChallenge ADD CONSTRAINT CK_Otp_estado CHECK (estado IN ('PENDIENTE','VERIFICADO','FALLIDO','EXPIRADO'))
         - createIndex:
             indexName: IX_Otp_sesion
             tableName: OtpChallenge
@@ -69,7 +69,7 @@ databaseChangeLog:
             referencedColumnNames: ticket_id
         - sql:
             dbms: mssql
-            sql: ALTER TABLE EmailOutbox ADD CONSTRAINT CK_Email_estado CHECK (estado IN ('PENDIENTE','ENVIADO','ERROR'))
+            sql: ALTER TABLE ${database.defaultSchemaName}.EmailOutbox ADD CONSTRAINT CK_Email_estado CHECK (estado IN ('PENDIENTE','ENVIADO','ERROR'))
       rollback:
         - dropTable: {tableName: EmailOutbox}
         - dropTable: {tableName: LoginTrack}

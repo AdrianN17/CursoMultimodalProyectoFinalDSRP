@@ -5,9 +5,41 @@ from datetime import datetime
 
 import pytest
 
+from reclamos.db import calificar
 from reclamos.escenario import TIPOS_CASO, construir_escenario
 from reclamos.politicas.motor import ContextoPolitica, evaluar
 from reclamos.validadores.constancia import validar_constancia
+
+
+# ---------------------------------------------------------------- esquema SQL
+@pytest.mark.parametrize("sql,esperado", [
+    ("SELECT * FROM Ticket WHERE ticket_id = ?", "SELECT * FROM [multimodal].[Ticket] WHERE ticket_id = ?"),
+    ("UPDATE Transaccion SET anulada = 1", "UPDATE [multimodal].[Transaccion] SET anulada = 1"),
+    ("INSERT INTO TicketEvento (ticket_id) VALUES (?)", "INSERT INTO [multimodal].[TicketEvento] (ticket_id) VALUES (?)"),
+    ("FROM Transaccion t1 JOIN Transaccion t2 ON t2.g = t1.g",
+     "FROM [multimodal].[Transaccion] t1 JOIN [multimodal].[Transaccion] t2 ON t2.g = t1.g"),
+    ("IF OBJECT_ID('checkpoints') IS NULL CREATE TABLE checkpoints (a INT)",
+     "IF OBJECT_ID('multimodal.checkpoints') IS NULL CREATE TABLE [multimodal].[checkpoints] (a INT)"),
+    ("DELETE FROM checkpoint_writes WHERE thread_id = ?", "DELETE FROM [multimodal].[checkpoint_writes] WHERE thread_id = ?"),
+])
+def test_calificar_antepone_el_esquema_a_las_tablas_del_proyecto(sql, esperado):
+    assert calificar(sql, "multimodal") == esperado
+
+
+@pytest.mark.parametrize("sql", [
+    "SELECT * FROM [otro].[Ticket]",            # ya calificada
+    "SELECT * FROM multimodal.Ticket",          # ya calificada
+    "SELECT name FROM sys.tables",              # objeto de sistema
+    "SELECT * FROM TablaAjena",                 # no es del proyecto
+])
+def test_calificar_no_toca_lo_que_no_corresponde(sql):
+    assert calificar(sql, "multimodal") == sql
+
+
+def test_calificar_con_esquema_vacio_no_cambia_nada():
+    sql = "SELECT * FROM Ticket"
+    assert calificar(sql, "") == sql
+
 
 
 # ---------------------------------------------------------------- semilla

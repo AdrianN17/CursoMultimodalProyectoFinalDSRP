@@ -3,7 +3,8 @@
 El camino oficial es Liquibase (docker compose run --rm liquibase). Este script existe para equipos
 sin Java/Docker: lee el MISMO db.changelog-master.yaml (cambios YAML nativos: createTable, addColumn,
 addForeignKeyConstraint, createIndex, insert, sql), los traduce a T-SQL y registra los
-changeSets en la tabla __CAMBIOS_LOCALES. No mezclar con Liquibase sobre la misma base.
+changeSets en la tabla __CAMBIOS_LOCALES. Todo se crea en el esquema AZURE_SQL_SCHEMA (por defecto `multimodal`),
+que el script crea si no existe. No mezclar con Liquibase sobre la misma base.
 
 Uso:  python scripts/aplicar_esquema.py [--reset] [--sql]
 """
@@ -19,6 +20,7 @@ RAIZ = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(RAIZ / "src"))
 
 from reclamos import db  # noqa: E402
+from reclamos.config import get_settings  # noqa: E402
 
 CHANGELOG = RAIZ / "db" / "changelog" / "db.changelog-master.yaml"
 
@@ -38,6 +40,15 @@ def _cargar(ruta: Path) -> list[dict]:
 
 def _literal(v) -> str:
     return "'" + str(v).replace("'", "''") + "'"
+
+
+def _esquema() -> str:
+    return get_settings().sql_schema or "dbo"
+
+
+def _t(tabla: str) -> str:
+    """Nombre de tabla calificado con el esquema del proyecto."""
+    return f"[{_esquema()}].[{tabla}]"
 
 
 def _definicion_columna(c: dict) -> str:
@@ -75,7 +86,7 @@ def _sql_create_table(a: dict) -> str:
         if k.get("unique"):
             lineas.append(f"CONSTRAINT {k.get('uniqueConstraintName') or 'UQ_' + a['tableName'] + '_' + c['name']} "
                           f"UNIQUE ([{c['name']}])")
-    return f"CREATE TABLE [{a['tableName']}] (\n    " + ",\n    ".join(lineas) + "\n)"
+    return f"CREATE TABLE {_t(a['tableName'])} (\n    " + ",\n    ".join(lineas) + "\n)"
 
 
 def _sentencias_cambio(tipo: str, a: dict) -> list[tuple[str, tuple]]:
@@ -83,38 +94,50 @@ def _sentencias_cambio(tipo: str, a: dict) -> list[tuple[str, tuple]]:
     if tipo == "createTable":
         return [(_sql_create_table(a), ())]
     if tipo == "addColumn":
-        return [(f"ALTER TABLE [{a['tableName']}] ADD {_definicion_columna(x['column'])}", ()) for x in a["columns"]]
+        return [(f"ALTER TABLE {_t(a['tableName'])} ADD {_definicion_columna(x['column'])}", ()) for x in a["columns"]]
     if tipo == "addForeignKeyConstraint":
-        return [(f"ALTER TABLE [{a['baseTableName']}] ADD CONSTRAINT {a['constraintName']} FOREIGN KEY "
-                 f"({a['baseColumnNames']}) REFERENCES [{a['referencedTableName']}] ({a['referencedColumnNames']})", ())]
+        return [(f"ALTER TABLE {_t(a['baseTableName'])} ADD CONSTRAINT {a['constraintName']} FOREIGN KEY "
+                 f"({a['baseColumnNames']}) REFERENCES {_t(a['referencedTableName'])} "
+                 f"({a['referencedColumnNames']})", ())]
     if tipo == "createIndex":
         cols = ", ".join(f"[{x['column']['name']}]" for x in a["columns"])
         unico = "UNIQUE " if a.get("unique") else ""
-        return [(f"CREATE {unico}INDEX {a['indexName']} ON [{a['tableName']}] ({cols})", ())]
+        return [(f"CREATE {unico}INDEX {a['indexName']} ON {_t(a['tableName'])} ({cols})", ())]
     if tipo == "insert":
         cols = [x["column"] for x in a["columns"]]
         valores = tuple(c["valueNumeric"] if "valueNumeric" in c else c["value"] for c in cols)
-        return [(f"INSERT INTO [{a['tableName']}] ({', '.join(c['name'] for c in cols)}) "
+        return [(f"INSERT INTO {_t(a['tableName'])} ({', '.join(c['name'] for c in cols)}) "
                  f"VALUES ({', '.join('?' for _ in cols)})", valores)]
     if tipo == "sql":
-        return [(s.strip(), ()) for s in a["sql"].split(";") if s.strip()]
+        # Misma propiedad integrada que usa Liquibase en los `sql` crudos del changelog.
+        texto = a["sql"].replace("${database.defaultSchemaName}", f"[{_esquema()}]")
+        return [(s.strip(), ()) for s in texto.split(";") if s.strip()]
     raise NotImplementedError(f"Cambio de Liquibase no soportado por el runner local: {tipo}")
 
 
 def resetear() -> None:
+    """Elimina SOLO las tablas del esquema del proyecto (la base puede compartirse con otros proyectos)."""
+    esquema = _esquema()
+    if esquema.lower() == "dbo":
+        sys.exit("--reset se niega a limpiar 'dbo': defina AZURE_SQL_SCHEMA (p. ej. multimodal).")
     with db.conexion(autocommit=True) as cn:
-        cur = cn.cursor()
-        for fila in cur.execute(
-            "SELECT OBJECT_NAME(parent_object_id) AS t, name FROM sys.foreign_keys"
-        ).fetchall():
-            cn.cursor().execute(f"ALTER TABLE [{fila.t}] DROP CONSTRAINT [{fila.name}]")
-        for fila in cn.cursor().execute("SELECT name FROM sys.tables").fetchall():
-            cn.cursor().execute(f"DROP TABLE [{fila.name}]")
-    print("Base reiniciada (todas las tablas eliminadas).")
+        fks = cn.cursor().execute(
+            "SELECT OBJECT_NAME(f.parent_object_id) AS t, f.name FROM sys.foreign_keys f "
+            "JOIN sys.tables t ON t.object_id = f.parent_object_id JOIN sys.schemas s ON s.schema_id = t.schema_id "
+            "WHERE s.name = ?", (esquema,)).fetchall()
+        for fila in fks:
+            cn.cursor().execute(f"ALTER TABLE {_t(fila.t)} DROP CONSTRAINT [{fila.name}]")
+        tablas = cn.cursor().execute(
+            "SELECT t.name FROM sys.tables t JOIN sys.schemas s ON s.schema_id = t.schema_id WHERE s.name = ?",
+            (esquema,)).fetchall()
+        for fila in tablas:
+            cn.cursor().execute(f"DROP TABLE {_t(fila.name)}")
+    print(f"Esquema '{esquema}' reiniciado (solo sus tablas).")
 
 
 def aplicar(solo_imprimir: bool = False) -> None:
     if solo_imprimir:
+        print(f"-- esquema: {_esquema()}")
         for item in _cargar(CHANGELOG):
             cs = item["changeSet"]
             print(f"-- changeSet {cs['id']}")
@@ -123,11 +146,13 @@ def aplicar(solo_imprimir: bool = False) -> None:
                 for sentencia, params in _sentencias_cambio(tipo, args):
                     print(sentencia + (f"  -- params={params}" if params else "") + ";")
         return
+    esquema, control = _esquema(), f"[{_esquema()}].[__CAMBIOS_LOCALES]"
     with db.conexion(autocommit=True) as cn:
+        cn.cursor().execute(f"IF SCHEMA_ID('{esquema}') IS NULL EXEC('CREATE SCHEMA [{esquema}]')")
         cn.cursor().execute(
-            "IF OBJECT_ID('__CAMBIOS_LOCALES') IS NULL CREATE TABLE __CAMBIOS_LOCALES (id VARCHAR(100) PRIMARY KEY)"
+            f"IF OBJECT_ID('{esquema}.__CAMBIOS_LOCALES') IS NULL CREATE TABLE {control} (id VARCHAR(100) PRIMARY KEY)"
         )
-        hechos = {f.id for f in cn.cursor().execute("SELECT id FROM __CAMBIOS_LOCALES").fetchall()}
+        hechos = {f.id for f in cn.cursor().execute(f"SELECT id FROM {control}").fetchall()}
         for item in _cargar(CHANGELOG):
             cs = item["changeSet"]
             if cs["id"] in hechos:
@@ -137,13 +162,13 @@ def aplicar(solo_imprimir: bool = False) -> None:
                 (tipo, args), = cambio.items()
                 for sentencia, params in _sentencias_cambio(tipo, args):
                     cn.cursor().execute(sentencia, params)
-            cn.cursor().execute("INSERT INTO __CAMBIOS_LOCALES (id) VALUES (?)", (cs["id"],))
+            cn.cursor().execute(f"INSERT INTO {control} (id) VALUES (?)", (cs["id"],))
             print(f"+ {cs['id']}")
 
 
 if __name__ == "__main__":
     ap = argparse.ArgumentParser(description=__doc__)
-    ap.add_argument("--reset", action="store_true", help="elimina TODAS las tablas antes de aplicar")
+    ap.add_argument("--reset", action="store_true", help="elimina las tablas del esquema del proyecto antes de aplicar")
     ap.add_argument("--sql", action="store_true", help="solo imprime el T-SQL equivalente (no toca la BD)")
     args = ap.parse_args()
     if args.sql:

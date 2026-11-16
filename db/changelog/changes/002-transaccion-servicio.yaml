@@ -41,16 +41,16 @@ databaseChangeLog:
             referencedColumnNames: servicio_id
         - sql:
             dbms: mssql
-            sql: ALTER TABLE Transaccion ADD CONSTRAINT CK_Tx_monto CHECK (monto > 0)
+            sql: ALTER TABLE ${database.defaultSchemaName}.Transaccion ADD CONSTRAINT CK_Tx_monto CHECK (monto > 0)
         - sql:
             dbms: mssql
-            sql: ALTER TABLE Transaccion ADD CONSTRAINT CK_Tx_moneda CHECK (moneda = 'PEN')
+            sql: ALTER TABLE ${database.defaultSchemaName}.Transaccion ADD CONSTRAINT CK_Tx_moneda CHECK (moneda = 'PEN')
         - sql:
             dbms: mssql
-            sql: ALTER TABLE Transaccion ADD CONSTRAINT CK_Tx_estado CHECK (estado IN ('APROBADA','ANULADA','REEMBOLSADA'))
+            sql: ALTER TABLE ${database.defaultSchemaName}.Transaccion ADD CONSTRAINT CK_Tx_estado CHECK (estado IN ('APROBADA','ANULADA','REEMBOLSADA'))
         - sql:
             dbms: mssql
-            sql: ALTER TABLE Transaccion ADD CONSTRAINT CK_Tx_canal CHECK (canal IN ('POS','ONLINE','APP'))
+            sql: ALTER TABLE ${database.defaultSchemaName}.Transaccion ADD CONSTRAINT CK_Tx_canal CHECK (canal IN ('POS','ONLINE','APP'))
         - createIndex:
             indexName: IX_Transaccion_tarjeta
             tableName: Transaccion

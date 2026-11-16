@@ -42,6 +42,8 @@ def _importar_script(nombre: str):
 if not INTEGRACION:
     import sql_falso
 
+    # SQLite no tiene esquemas: sin prefijo (el código y el changelog usan nombres planos en este modo).
+    os.environ["AZURE_SQL_SCHEMA"] = ""
     # Debe ocurrir antes de importar `reclamos`: db.py, el checkpointer y las tools hacen `import pyodbc`.
     sql_falso.instalar(lambda: _importar_script("aplicar_esquema")._cargar(
         RAIZ / "db" / "changelog" / "db.changelog-master.yaml"))

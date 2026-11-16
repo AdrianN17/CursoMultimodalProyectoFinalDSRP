@@ -12,8 +12,10 @@ RAIZ = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(RAIZ / "src"))
 
 from reclamos import db  # noqa: E402
+from reclamos.config import get_settings  # noqa: E402
 
 ARCHIVO = RAIZ / "db" / "datos_prueba_fraude_otp.sql"
+ESQUEMA_ARCHIVO = "multimodal"
 
 
 def sentencias(sql: str) -> list[str]:
@@ -22,8 +24,10 @@ def sentencias(sql: str) -> list[str]:
 
 
 if __name__ == "__main__":
+    esquema = get_settings().sql_schema or "dbo"
+    texto = ARCHIVO.read_text(encoding="utf-8").replace(f"{ESQUEMA_ARCHIVO}.", f"{esquema}.")
     with db.conexion(autocommit=True) as cn:
-        for s in sentencias(ARCHIVO.read_text(encoding="utf-8")):
+        for s in sentencias(texto):
             cur = cn.cursor()
             cur.execute(s)
             if cur.description:

@@ -18,7 +18,7 @@ databaseChangeLog:
               - column: {name: creado_en,   type: DATETIME2, defaultValueComputed: SYSUTCDATETIME(), defaultValueConstraintName: DF_Cliente_creado, constraints: {nullable: false}}
         - sql:
             dbms: mssql
-            sql: ALTER TABLE Cliente ADD CONSTRAINT CK_Cliente_estado CHECK (estado IN ('ACTIVO','BLOQUEADO'))
+            sql: ALTER TABLE ${database.defaultSchemaName}.Cliente ADD CONSTRAINT CK_Cliente_estado CHECK (estado IN ('ACTIVO','BLOQUEADO'))
 
         - createTable:
             tableName: Cuenta
@@ -36,13 +36,13 @@ databaseChangeLog:
             referencedColumnNames: cliente_id
         - sql:
             dbms: mssql
-            sql: ALTER TABLE Cuenta ADD CONSTRAINT CK_Cuenta_tipo CHECK (tipo IN ('AHORROS','CORRIENTE','TARJETA'))
+            sql: ALTER TABLE ${database.defaultSchemaName}.Cuenta ADD CONSTRAINT CK_Cuenta_tipo CHECK (tipo IN ('AHORROS','CORRIENTE','TARJETA'))
         - sql:
             dbms: mssql
-            sql: ALTER TABLE Cuenta ADD CONSTRAINT CK_Cuenta_moneda CHECK (moneda = 'PEN')
+            sql: ALTER TABLE ${database.defaultSchemaName}.Cuenta ADD CONSTRAINT CK_Cuenta_moneda CHECK (moneda = 'PEN')
         - sql:
             dbms: mssql
-            sql: ALTER TABLE Cuenta ADD CONSTRAINT CK_Cuenta_estado CHECK (estado IN ('ACTIVA','CERRADA'))
+            sql: ALTER TABLE ${database.defaultSchemaName}.Cuenta ADD CONSTRAINT CK_Cuenta_estado CHECK (estado IN ('ACTIVA','CERRADA'))
 
         - createTable:
             tableName: Balance
@@ -75,7 +75,7 @@ databaseChangeLog:
             referencedColumnNames: cuenta_id
         - sql:
             dbms: mssql
-            sql: ALTER TABLE Tarjeta ADD CONSTRAINT CK_Tarjeta_dia CHECK (dia_facturacion BETWEEN 1 AND 28)
+            sql: ALTER TABLE ${database.defaultSchemaName}.Tarjeta ADD CONSTRAINT CK_Tarjeta_dia CHECK (dia_facturacion BETWEEN 1 AND 28)
       rollback:
         - dropTable: {tableName: Tarjeta}
         - dropTable: {tableName: Balance}

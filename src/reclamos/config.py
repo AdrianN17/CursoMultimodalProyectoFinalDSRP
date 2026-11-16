@@ -35,6 +35,7 @@ class Settings:
     tts_voz: str
     sql_server: str
     sql_database: str
+    sql_schema: str  # esquema propio del proyecto dentro de la BD ("" = esquema por defecto del usuario)
     sql_user: str
     sql_password: str
     sql_driver: str
@@ -94,6 +95,7 @@ def get_settings() -> Settings:
         tts_voz=e("TTS_VOZ", "alloy"),
         sql_server=e("AZURE_SQL_SERVER", ""),
         sql_database=e("AZURE_SQL_DATABASE", "reclamos"),
+        sql_schema=e("AZURE_SQL_SCHEMA", "multimodal").strip(),
         sql_user=e("AZURE_SQL_USER", ""),
         sql_password=e("AZURE_SQL_PASSWORD", ""),
         sql_driver=e("AZURE_SQL_DRIVER", "ODBC Driver 18 for SQL Server"),

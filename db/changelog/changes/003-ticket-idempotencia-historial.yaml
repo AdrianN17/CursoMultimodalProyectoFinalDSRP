@@ -36,13 +36,13 @@ databaseChangeLog:
             referencedColumnNames: transaccion_id
         - sql:
             dbms: mssql
-            sql: ALTER TABLE Ticket ADD CONSTRAINT CK_Ticket_estado CHECK (estado IN ('ABIERTO','EN_ANALISIS','PENDIENTE_APROBACION','EN_ESCALAMIENTO','PENDIENTE_TECNICO','CERRADO'))
+            sql: ALTER TABLE ${database.defaultSchemaName}.Ticket ADD CONSTRAINT CK_Ticket_estado CHECK (estado IN ('ABIERTO','EN_ANALISIS','PENDIENTE_APROBACION','EN_ESCALAMIENTO','PENDIENTE_TECNICO','CERRADO'))
         - sql:
             dbms: mssql
-            sql: ALTER TABLE Ticket ADD CONSTRAINT CK_Ticket_resolucion CHECK (resolucion IS NULL OR resolucion IN ('REEMBOLSO','ANULACION','RECHAZADO','INFORMATIVO','ESCALADO','EXPIRADO'))
+            sql: ALTER TABLE ${database.defaultSchemaName}.Ticket ADD CONSTRAINT CK_Ticket_resolucion CHECK (resolucion IS NULL OR resolucion IN ('REEMBOLSO','ANULACION','RECHAZADO','INFORMATIVO','ESCALADO','EXPIRADO'))
         - sql:
             dbms: mssql
-            sql: ALTER TABLE Ticket ADD CONSTRAINT CK_Ticket_accion CHECK (accion_ejecutada IS NULL OR accion_ejecutada IN ('ANULACION','REEMBOLSO'))
+            sql: ALTER TABLE ${database.defaultSchemaName}.Ticket ADD CONSTRAINT CK_Ticket_accion CHECK (accion_ejecutada IS NULL OR accion_ejecutada IN ('ANULACION','REEMBOLSO'))
         - createIndex:
             indexName: IX_Ticket_cliente
             tableName: Ticket
@@ -84,7 +84,7 @@ databaseChangeLog:
             referencedColumnNames: ticket_id
         - sql:
             dbms: mssql
-            sql: ALTER TABLE TicketEvento ADD CONSTRAINT CK_Evento_actor CHECK (actor IN ('agente','analista','sistema','cliente'))
+            sql: ALTER TABLE ${database.defaultSchemaName}.TicketEvento ADD CONSTRAINT CK_Evento_actor CHECK (actor IN ('agente','analista','sistema','cliente'))
         - createIndex:
             indexName: IX_TicketEvento_ticket
             tableName: TicketEvento

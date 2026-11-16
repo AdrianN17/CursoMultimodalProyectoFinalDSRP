@@ -44,16 +44,21 @@ Para probar **sin costo ni red** use `PROVEEDOR_IA=mock` en `.env` (STT/visión/
 ## Base de datos (Liquibase YAML)
 
 ```powershell
-# Opción A – Liquibase (Docker o CLI):
+# Opción A – Liquibase (Docker o CLI). Una sola vez, crear el esquema (el changelog y DATABASECHANGELOG viven en él):
+docker compose --profile migrar run --rm liquibase execute-sql --sql="IF SCHEMA_ID('multimodal') IS NULL EXEC('CREATE SCHEMA multimodal')"
 docker compose --profile migrar run --rm liquibase
-# Opción B – sin Java/Docker: ejecuta el MISMO changelog con un runner Python:
-python scripts/aplicar_esquema.py            # añade --reset para recrear
+# Opción B – sin Java/Docker: ejecuta el MISMO changelog con un runner Python (crea el esquema si falta):
+python scripts/aplicar_esquema.py            # añade --reset para recrear solo las tablas del esquema
 ```
 
+**Esquema propio `multimodal`** (`AZURE_SQL_SCHEMA`): todas las tablas viven ahí, no en `dbo`, para convivir con otros proyectos en la misma base.
+El código escribe SQL sin esquema y `reclamos/db.py` (`calificar`) lo antepone a las tablas del proyecto; en el changelog, los cambios tipados usan `default-schema-name` (`db/liquibase.properties`) y los `sql` crudos `${database.defaultSchemaName}`.
+> La opción A (Liquibase real) **no se ha ejecutado** en este entorno; el runner Python sí (validado contra Azure SQL).
+
 El esquema vive en `db/changelog/db.changelog-master.yaml` (incluye `db/changelog/changes/001..009-*.yaml`, cambios YAML nativos de Liquibase con *rollback*).
-Datos de prueba de fraude (operaciones con/sin OTP, política P-11): `python scripts/cargar_datos_fraude.py` (carga `db/datos_prueba_fraude_otp.sql`; ejecútelo después de `seed_db.py`).
-> `aplicar_esquema.py --reset` elimina **todas** las tablas de la base: úselo solo en una base exclusiva de este proyecto.
-Las tablas del checkpointer (`checkpoints`, `checkpoint_blobs`, `checkpoint_writes`) las crea `SqlServerSaver.setup()` al iniciar.
+Datos de prueba de fraude (operaciones con/sin OTP, política P-11): `python scripts/cargar_datos_fraude.py` (carga `db/datos_prueba_fraude_otp.sql`, que también puede ejecutarse tal cual en Azure Data Studio; ejecútelo después de `seed_db.py`).
+> `aplicar_esquema.py --reset` elimina **solo las tablas del esquema del proyecto** y se niega a limpiar `dbo`.
+Las tablas del checkpointer (`checkpoints`, `checkpoint_blobs`, `checkpoint_writes`) las crea `SqlServerSaver.setup()` al iniciar, también en `multimodal`.
 
 ## CASO_ID y SEMILLA
 

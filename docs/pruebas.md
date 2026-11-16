@@ -4,8 +4,8 @@ Resultados de la última ejecución (proveedor IA = *mock*; SQL **simulado con S
 
 | Comando | Resultado | Evidencia |
 |---|---|---|
-| `python -m pytest tests -v` | **68 passed, 1 skipped en 18.6 s** (el *skipped* es `test_hitl_se_reanuda_desde_otro_proceso`, marcado `integracion`) | `evidencia/pruebas/resultado_pytest.txt` (62 passed, ejecución previa con SQL Server real) |
-| `RUN_INTEGRACION=1 python -m pytest tests -v` | Misma suite contra SQL Server / Azure SQL **reales** (recarga la BD de `.env`; incluye la reanudación del HITL desde otro proceso) | no ejecutado tras añadir P-11 |
+| `python -m pytest tests -v` | **79 passed, 1 skipped en 14.2 s** (el *skipped* es `test_hitl_se_reanuda_desde_otro_proceso`, marcado `integracion`) | ejecución local; `evidencia/pruebas/resultado_pytest.txt` conserva la ejecución previa (62 passed, SQL Server real) |
+| `RUN_INTEGRACION=1 python -m pytest tests/test_persistencia_herramientas.py::test_hitl_se_reanuda_desde_otro_proceso -v` | **1 passed en 110.8 s** contra Azure SQL real (esquema `multimodal`; reanuda el HITL desde otro proceso) | ejecución local |
 | `python scripts/smoke_test.py` | **RESULTADO: OK** (7 escenarios + ciclo HITL) | `evidencia/pruebas/resultado_smoke_test.txt` |
 | `python main.py … --aprobar APROBADA` | `REEMBOLSO_PROGRAMADO`, `accion_final=REEMBOLSO` | `evidencia/pruebas/demo_duplicada_aprobada.txt` |
 | `python main.py … --aprobar RECHAZADA` | `HITL_RECHAZADO`, `accion_final=NINGUNA` (propuesta: `REEMBOLSO`) | `evidencia/pruebas/demo_duplicada_rechazada.txt` |
@@ -17,7 +17,7 @@ Resultados de la última ejecución (proveedor IA = *mock*; SQL **simulado con S
 
 | Archivo | Qué prueba |
 |---|---|
-| `tests/test_unidad.py` | Determinismo de la semilla; validador de constancia; motor de políticas (reglas P-xx incl. P-11 operación con/sin OTP, umbral de supervisor, discrepancia, manipulación) |
+| `tests/test_unidad.py` | Determinismo de la semilla; calificación de tablas con el esquema `multimodal`; validador de constancia; motor de políticas (reglas P-xx incl. P-11 operación con/sin OTP, umbral de supervisor, discrepancia, manipulación) |
 | `tests/test_flujos.py` | 8 escenarios (uno por tipo, incl. `SIN_CONSENTIMIENTO_CON_OTP`), HITL aprobar/rechazar/expirar, idempotencia, memoria de estado, OTP, adversariales y contradicción |
 | `tests/test_persistencia_herramientas.py` | Checkpoint legible por otra instancia; reanudación del HITL **desde otro proceso**; idempotencia de `crear_ticket`; privacidad de operaciones ajenas; `autenticada_otp` expuesto por la tool y escalada P-11; una sola acción por ticket; PII |
 | `tests/test_api.py` | OpenAPI, subida multipart, clave de analista, `problem+json`, formatos no admitidos, path traversal del audio |

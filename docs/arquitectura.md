@@ -104,6 +104,7 @@ Datos de prueba: `db/datos_prueba_fraude_otp.sql` (`python scripts/cargar_datos_
 
 - Autenticación real (el OTP es de demostración), antifraude y detección de comprobantes falsificados no están implementados.
 - Constancia solo en imagen (PNG/JPG); sin PDF ni multi-idioma.
+- Todas las tablas (negocio, tickets, checkpoints) viven en el esquema `multimodal` (`AZURE_SQL_SCHEMA`), no en `dbo`; ver D15 del diario y `reclamos/db.py`.
 - Qdrant en modo local admite un solo proceso; para producción use `QDRANT_URL` (Qdrant Cloud) y `QDRANT_API_KEY`.
 - `pytest` fuerza Qdrant local (`.qdrant_test/`) y SQL simulado: los embeddings *mock* (256 dim) no deben tocar una colección real indexada con embeddings de 1536 dim.
 - El runner Liquibase en Docker no se pudo ejecutar en el entorno de desarrollo (sin Docker/Java): el esquema se validó con `scripts/aplicar_esquema.py` sobre el mismo changelog.
