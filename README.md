@@ -90,7 +90,7 @@ python scripts/hitl_cli.py decidir APR-XXXXXXXXXX RECHAZADA "no procede" --rol S
 
 No hay verificación por OTP ni envío de correos: el cliente se identifica por la sesión y los escalamientos quedan registrados en el ticket (`EN_ESCALAMIENTO`). El OTP solo existe como **dato maestro** (`Transaccion.autenticada_otp`, política P-11).
 
-Tipos de caso: `DUPLICADA`, `SIN_CONSENTIMIENTO` (operación sin OTP → reclamo normal), `SIN_CONSENTIMIENTO_CON_OTP` (operación validada con OTP → escala a operador, P-11; solo con `--tipo`), `MONTO_DISCREPANTE`, `TARJETA_DESHABILITADA`, `SIN_EVIDENCIA`, `AJENA`, `MONEDA_USD`.
+Tipos de caso: `DUPLICADA`, `SIN_CONSENTIMIENTO` (operación sin OTP → reclamo normal), `SIN_CONSENTIMIENTO_CON_OTP` (operación validada con OTP → escala a operador, P-11; solo con `--tipo`), `MONTO_DISCREPANTE`, `TARJETA_DESHABILITADA`, `SIN_EVIDENCIA`, `AJENA`, `MONEDA_USD`. Cada uno, con su decisión, su resultado y comandos de ejemplo, está explicado en [`docs/casuisticas.md`](docs/casuisticas.md).
 
 ## Pruebas y evidencia
 
