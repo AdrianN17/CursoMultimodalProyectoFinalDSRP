@@ -1,6 +1,6 @@
 # Diario de decisiones
 
-> Cada fila describe una decisión **tomada al construir** este proyecto. Revísela y ajústela con su propia experiencia antes de entregar.
+> Cada fila describe una decisión **tomada al construir** este proyecto (D16 y D17 las pidió el alumno).
 
 | # | Problema | Alternativas | Decisión | Justificación | Riesgo |
 |---|---|---|---|---|---|
@@ -19,3 +19,5 @@
 | D13 | Proveedor de IA | SDK directo en los nodos / interfaz | `ProveedorIA` (Azure o mock) | Permite pruebas deterministas sin red ni costo y cambiar de proveedor | El mock no prueba la calidad real de visión/STT |
 | D14 | Esquema Liquibase | `sqlFile` / `createTable` nativo | YAML nativo (`createTable`, `addColumn`, `addForeignKeyConstraint`, `createIndex`, `insert`) con rollback por changeSet; los CHECK van como `sql` (Liquibase OSS no tiene `addCheckConstraint`) | Todo el esquema es declarativo en YAML; el runner Python lo traduce a T-SQL cuando no hay Java/Docker | El YAML con Liquibase real no se probó en este entorno; el runner se validó comparando columnas y constraints con la BD |
 | D15 | Dónde viven las tablas en una BD compartida | `dbo` / usuario dedicado con esquema por defecto / esquema `multimodal` con nombres calificados | Esquema `multimodal` (`AZURE_SQL_SCHEMA`); `db.calificar` antepone el esquema a las tablas del proyecto | No contamina `dbo` (comparte BD con otros proyectos, incl. un `DATABASECHANGELOG` ajeno) y no exige cambiar el esquema por defecto de un usuario compartido | El calificador es una expresión regular sobre una lista de tablas (no un parser SQL): una tabla nueva debe añadirse a `db.TABLAS` |
+| D16 | Cómo probar sin esperar 20 min | Pruebas contra Azure SQL *serverless* / SQL simulado (SQLite) + proveedor *mock* | SQL simulado y Qdrant embebido por defecto; `RUN_INTEGRACION=1` usa la BD real para una prueba marcada `integracion` | Cada flujo real tardaba ≈ 70 s (suite > 20 min); con el simulador la suite tarda ≈ 14 s y no toca servicios de pago ni compartidos | El simulador no valida T-SQL, `CHECK` ni claves foráneas: se cubre con la prueba de integración y el script de paridad del esquema |
+| D17 | Dónde ejecutar Qdrant y SQL | Contenedores locales / servicios en la nube | Qdrant Cloud, Azure SQL y Azure OpenAI (Foundry, `gpt-5-mini`); se quitaron `qdrant` y `sqlserver-local` del `docker-compose.yml` | Evita mantener infraestructura local y usa los recursos del curso | Latencia (≈ 2 s por consulta SQL; la BD *serverless* se pausa y la primera conexión falla por *timeout*) y dependencia de la red |

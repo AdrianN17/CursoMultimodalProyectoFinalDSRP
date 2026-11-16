@@ -105,7 +105,7 @@ Datos de prueba: `db/datos_prueba_fraude_otp.sql` (`python scripts/cargar_datos_
 - Autenticación real (el OTP es de demostración), antifraude y detección de comprobantes falsificados no están implementados.
 - Constancia solo en imagen (PNG/JPG); sin PDF ni multi-idioma.
 - Todas las tablas (negocio, tickets, checkpoints) viven en el esquema `multimodal` (`AZURE_SQL_SCHEMA`), no en `dbo`; ver D15 del diario y `reclamos/db.py`.
-- Qdrant en modo local admite un solo proceso; para producción use `QDRANT_URL` (Qdrant Cloud) y `QDRANT_API_KEY`.
-- `pytest` fuerza Qdrant local (`.qdrant_test/`) y SQL simulado: los embeddings *mock* (256 dim) no deben tocar una colección real indexada con embeddings de 1536 dim.
+- Qdrant en modo local admite un solo proceso; para producción use `QDRANT_URL` (Qdrant Cloud) y `QDRANT_API_KEY`. Con `PROVEEDOR_IA=mock` el código usa **siempre** Qdrant local (`QDRANT_PATH`), aunque haya `QDRANT_URL`, para que los embeddings *mock* (256 dim) no toquen la colección real (1536 dim).
+- `pytest` fuerza Qdrant local (`.qdrant_test/`) y SQL simulado.
 - El runner Liquibase en Docker no se pudo ejecutar en el entorno de desarrollo (sin Docker/Java): el esquema se validó con `scripts/aplicar_esquema.py` sobre el mismo changelog.
-- La ruta Azure OpenAI (`proveedores/azure_openai.py`) requiere credenciales reales; **no se ejecutó** en este entorno (las pruebas usan el proveedor *mock*).
+- La ruta Azure OpenAI (`proveedores/azure_openai.py`) se ejecutó **parcialmente** (chat, visión y embeddings con `gpt-5-mini` / `text-embedding-3-small`; ver `evidencia/pruebas/resultado_azure_parcial.txt`). Whisper y TTS no se han probado: sus *deployments* no existen en Foundry (`DeploymentNotFound`).

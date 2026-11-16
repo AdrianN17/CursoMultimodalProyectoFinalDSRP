@@ -5,9 +5,12 @@ Termina con código 0 solo si TODAS las verificaciones pasan.
 """
 from __future__ import annotations
 
+import os
 import sys
 import tempfile
 from pathlib import Path
+
+os.environ.setdefault("DEMO_MODE", "1")  # el smoke test lee el OTP simulado (otp_demo) de la sesión
 
 RAIZ = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(RAIZ / "src"))

@@ -1,0 +1,12 @@
+Ejecución real parcial con Azure OpenAI — 2026-11-16 — CASO_ID=C-07 SEMILLA=4213
+Servicios reales: Azure OpenAI (chat/visión gpt-5-mini, embeddings text-embedding-3-small), Azure SQL (esquema multimodal), Qdrant Cloud.
+Simulados: STT y TTS (los deployments `whisper` y `tts` devuelven DeploymentNotFound).
+
+[DUPLICADA] esperado=REEMBOLSO obtenido=PENDIENTE_APROBACION 65473 ms trace=fea42fb2 error=None
+[DUPLICADA] HITL aprobada -> accion_final=REEMBOLSO   (reanudación 21266 ms)
+[MONTO_DISCREPANTE] esperado=ESCALAR_OPERADOR obtenido=ESCALADO_DISCREPANCIA 74752 ms trace=a06550c6 error=None
+[AJENA] esperado=RECHAZAR obtenido=RECHAZO_AJENA 64027 ms trace=ceb1121e error=None
+
+Agente (gpt-5-mini): DUPLICADA -> COBRO_DUPLICADO propone REEMBOLSO (confianza 0.86); MONTO_DISCREPANTE -> propone ESCALAR_OPERADOR (0.85);
+AJENA -> propone ESCALAR_OPERADOR (0.40) y el motor decide RECHAZAR (P-04).
+Métricas: evidencia/resumen_metricas_azure.md

@@ -74,7 +74,7 @@ python scripts/ingestar_politicas.py                           # indexa P-01..P-
 
 ```powershell
 # 1) Prueba principal (extremo a extremo por CLI; aprueba como analista simulado)
-python main.py --caso-id C-07 --semilla 4213 --aprobar APROBADA
+python main.py --caso-id C-07 --semilla 4213 --tipo DUPLICADA --aprobar APROBADA   # sin --tipo, la semilla 4213 sortea SIN_EVIDENCIA (PEDIR_INFO, sin HITL)
 python main.py --caso-id C-07 --semilla 4213 --tipo DUPLICADA --aprobar RECHAZADA   # fuerza un tipo de caso
 
 # 2) API + web:  http://localhost:8000  (cliente)  ·  /analista.html  ·  /docs (OpenAPI)
@@ -128,5 +128,5 @@ respuesta solo en audio · `DEMO_MODE=0` en producción (oculta OTP y errores in
 
 ## Video y declaración de IA
 
-- Video (≤10 min, enlace no listado): _pendiente: pegar enlace_ — nombre sugerido `C-07_4213_<apellido>.mp4`.
-- Informe y declaración de uso de IA: [`docs/informe.md`](docs/informe.md), [`docs/declaracion_uso_ia.md`](docs/declaracion_uso_ia.md).
+- Video (≤10 min, enlace no listado): _pendiente: pegar enlace_ — nombre del archivo `C-07_4213_Melgarejo.mp4`.
+- Informe: [`docs/informe.pdf`](docs/informe.pdf) (se regenera desde `docs/informe.md` con `python scripts/generar_informe_pdf.py`; requiere `pip install markdown` y Edge o Chrome) · declaración de uso de IA: [`docs/declaracion_uso_ia.md`](docs/declaracion_uso_ia.md).

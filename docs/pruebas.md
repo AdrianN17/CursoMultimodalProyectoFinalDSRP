@@ -4,14 +4,15 @@ Resultados de la última ejecución (proveedor IA = *mock*; SQL **simulado con S
 
 | Comando | Resultado | Evidencia |
 |---|---|---|
-| `python -m pytest tests -v` | **79 passed, 1 skipped en 14.2 s** (el *skipped* es `test_hitl_se_reanuda_desde_otro_proceso`, marcado `integracion`) | ejecución local; `evidencia/pruebas/resultado_pytest.txt` conserva la ejecución previa (62 passed, SQL Server real) |
-| `RUN_INTEGRACION=1 python -m pytest tests/test_persistencia_herramientas.py::test_hitl_se_reanuda_desde_otro_proceso -v` | **1 passed en 110.8 s** contra Azure SQL real (esquema `multimodal`; reanuda el HITL desde otro proceso) | ejecución local |
-| `python scripts/smoke_test.py` | **RESULTADO: OK** (7 escenarios + ciclo HITL) | `evidencia/pruebas/resultado_smoke_test.txt` |
+| `python -m pytest tests -v` | **79 passed, 1 skipped en 13.8 s** (el *skipped* es `test_hitl_se_reanuda_desde_otro_proceso`, marcado `integracion`) | `evidencia/pruebas/resultado_pytest.txt` |
+| `RUN_INTEGRACION=1 python -m pytest tests/test_persistencia_herramientas.py::test_hitl_se_reanuda_desde_otro_proceso -v` | **1 passed en 115.9 s** contra Azure SQL real (esquema `multimodal`; reanuda el HITL desde otro proceso) | ejecución local |
+| `python scripts/smoke_test.py` (mock + Azure SQL real) | **RESULTADO: OK** (7 escenarios + ciclo HITL) | `evidencia/pruebas/resultado_smoke_test.txt` |
+| Flujo con Azure OpenAI real (chat, visión y embeddings; STT/TTS simulados): `DUPLICADA` + HITL, `MONTO_DISCREPANTE`, `AJENA` | Las 3 decisiones esperadas; 65 s de latencia p50, ≈ USD 0.008 por reclamo | `evidencia/pruebas/resultado_azure_parcial.txt`, `evidencia/resumen_metricas_azure.md` |
 | `python main.py … --aprobar APROBADA` | `REEMBOLSO_PROGRAMADO`, `accion_final=REEMBOLSO` | `evidencia/pruebas/demo_duplicada_aprobada.txt` |
 | `python main.py … --aprobar RECHAZADA` | `HITL_RECHAZADO`, `accion_final=NINGUNA` (propuesta: `REEMBOLSO`) | `evidencia/pruebas/demo_duplicada_rechazada.txt` |
 
 > **Alcance honesto:** el proveedor *mock* valida el flujo, las políticas, las tools, el HITL y la persistencia, **no** la calidad de Whisper, la visión ni el TTS reales. El SQL simulado (SQLite) **no** valida T-SQL real, `CHECK` ni claves foráneas: eso lo cubre `RUN_INTEGRACION=1` y el script de paridad del esquema.
-> Antes de la entrega, repita `main.py` y `smoke_test.py` con `PROVEEDOR_IA=azure` y guarde esa salida junto a la anterior.
+> La ejecución con Azure OpenAI es **parcial**: `whisper` y `tts` devuelven `DeploymentNotFound`. Cuando existan, repita `main.py` y `smoke_test.py` con `PROVEEDOR_IA=azure` y guarde esa salida junto a la anterior. Para el *smoke test* con el proveedor *mock*, el código usa siempre Qdrant local (`QDRANT_PATH`) aunque `.env` tenga `QDRANT_URL`: la colección de Qdrant Cloud tiene vectores de 1536 dimensiones y el *mock* genera 256.
 
 ## Cobertura por archivo
 

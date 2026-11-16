@@ -32,11 +32,12 @@ atexit.register(cerrar_clientes)  # evita el ImportError de QdrantClient.__del__
 
 def obtener_cliente() -> QdrantClient:
     s = get_settings()
-    clave = s.qdrant_url or s.qdrant_path
+    url = "" if s.proveedor == "mock" else s.qdrant_url  # el mock (256 dim) nunca debe tocar la colección real (1536 dim)
+    clave = url or s.qdrant_path
     with _LOCK:
         if clave not in _CLIENTES:
-            _CLIENTES[clave] = (QdrantClient(url=s.qdrant_url, api_key=s.qdrant_api_key or None)
-                                if s.qdrant_url else QdrantClient(path=s.qdrant_path))
+            _CLIENTES[clave] = (QdrantClient(url=url, api_key=s.qdrant_api_key or None)
+                                if url else QdrantClient(path=s.qdrant_path))
         return _CLIENTES[clave]
 
 

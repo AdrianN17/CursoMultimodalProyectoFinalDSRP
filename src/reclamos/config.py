@@ -113,6 +113,6 @@ def get_settings() -> Settings:
         max_upload_mb=int(e("MAX_UPLOAD_MB", "5")),
         demo_mode=_bool(e("DEMO_MODE"), False),
         mcp_transport=e("MCP_TRANSPORT", "stdio").lower(),
-        precio_in_1k=float(e("PRECIO_USD_1K_TOKENS_IN", "0.0025")),
-        precio_out_1k=float(e("PRECIO_USD_1K_TOKENS_OUT", "0.01")),
+        precio_in_1k=float(e("PRECIO_USD_1K_TOKENS_IN", "0.00025")),
+        precio_out_1k=float(e("PRECIO_USD_1K_TOKENS_OUT", "0.002")),
     )
